@@ -2,7 +2,7 @@
 
 **Project:** Clown Circus Reloaded (brownfield reimplementation of Clown Circus Carnival)
 **Report date:** 2026-10-13
-**Author:** ZCode discovery agent, commissioned by the project diary entry of 2026-10-13 ([`docs/diary.md`](../diary.md))
+**Author:** ZCode discovery agent, commissioned by the project diary entry of 2026-10-13 ([`_docs/diary.md`](diary.md))
 **Status:** Analysis only. No architectural decisions, no implementation, no changes to existing artifacts.
 
 ---
@@ -23,19 +23,19 @@ The strongest continuities are real: the 2025 project already used AGENTS.md fil
 
 **2025 repository** — [lucapug/clown-circus-carnival](https://github.com/lucapug/clown-circus-carnival), inspected read-only via a temporary clone (all branches: `main`, `logic`, `style`; full history; PR list via GitHub API; repo metadata). Key files examined: `AGENTS.md`, `frontend/src/AGENTS.md`, `docs/ai-usage.md`, `.github/instructions/copilot-instructions.instructions.md`, `.github/workflows/{ci,guardrails}.yml`, `docs/architecture/{backend-design,openapi-spec,api-integration}.md`, `docs/decisions/backend-api.md`, `TESTING.md`, `TEST_COMMANDS.md`, `CI_IMPLEMENTATION.md`, `Dockerfile`, `docker-compose.yml`, `render.yaml`, root and frontend `package.json`, the full backend (`backend/app/*`, `backend/tests/test_api.py`), and the game code (`frontend/src/hooks/useGameEngine.ts`, `frontend/src/types/game.ts`, `frontend/src/utils/scoring.ts`, `frontend/src/components/game/*.tsx`, `frontend/src/lib/api.ts`).
 
-**2026 course knowledge base** — [`docs/course_KB/`](../course_KB/) in this repository:
+**2026 course knowledge base** — [`docs/course_KB/`](../docs/course_KB/) in this repository:
 
 | File | Content |
 |---|---|
-| [`01…Zoomcamp 2026 Starts Today.pdf`](../course_KB/01Alexey%20On%20Data%20-%20AI%20Dev%20Tools%20Zoomcamp%202026%20Starts%20Today.pdf) | Course overview: 5 modules, cohort logistics, final-project requirements summary |
-| [`02…Specifications, Loop and Graph Engineering.pdf`](../course_KB/02Alexey%20On%20Data%20-%20AI-Native%20Development_%20Specifications%2C%20Loop%20and%20Graph%20Engineering.pdf) | Module 1 companion article (spec-driven dev, context/loop/graph engineering, PM/SWE/QA roles, orchestrator) |
-| [`03…Build and Ship a Full-Stack App….pdf`](../course_KB/03Alexey%20On%20Data%20-%20Build%20and%20Ship%20a%20Full-Stack%20App%20with%20AI%20Coding%20Assistants.pdf) | Module 2 companion article (frontend-first, OpenAPI contract, FastAPI backend, SQLite persistence) |
-| [`04…Reusable Skills and Specialized Subagents.pdf`](../course_KB/04Alexey%20On%20Data%20-%20Coding%20Agent%20Building%20Blocks_%20Reusable%20Skills%20and%20Specialized%20Subagents.pdf) | Module 5 companion article (skills, subagents, orchestration, worktrees, parallelism) |
-| [`05…Deploy a Full-Stack App….pdf`](../course_KB/05Alexey%20On%20Data%20-%20Deploy%20a%20Full-Stack%20App%20with%20AI%20Coding%20Assistants.pdf) | Module 3 companion article (containerization, Postgres, integration/E2E tests, AWS, CI/CD with OIDC) |
-| [`06…DevOps and Observability….pdf`](../course_KB/06Alexey%20On%20Data%20-%20DevOps%20and%20Observability%20for%20an%20AI-Built%20App.pdf) | Module 4 companion article (dev/prod, registry-pinned images, OpenTelemetry, alerts, AI on-call) |
-| [`07use-claude-code-like-a-pro-webinar/`](../course_KB/07use-claude-code-like-a-pro-webinar/) | External webinar (README + full worksheet): ADLC, layered context, subagent team, hooks, `/task`, `/loop`, MCP, plugins, token-usage tooling |
-| [`project_requirements.html`](../course_KB/project_requirements.html) | Local snapshot of the DataTalks.Club docs "Project" page |
-| [`project_rubric_2026.url`](../course_KB/project_rubric_2026.url) | Internet shortcut → course repo `project/` folder |
+| [`01…Zoomcamp 2026 Starts Today.pdf`](../docs/course_KB/01Alexey%20On%20Data%20-%20AI%20Dev%20Tools%20Zoomcamp%202026%20Starts%20Today.pdf) | Course overview: 5 modules, cohort logistics, final-project requirements summary |
+| [`02…Specifications, Loop and Graph Engineering.pdf`](../docs/course_KB/02Alexey%20On%20Data%20-%20AI-Native%20Development_%20Specifications%2C%20Loop%20and%20Graph%20Engineering.pdf) | Module 1 companion article (spec-driven dev, context/loop/graph engineering, PM/SWE/QA roles, orchestrator) |
+| [`03…Build and Ship a Full-Stack App….pdf`](../docs/course_KB/03Alexey%20On%20Data%20-%20Build%20and%20Ship%20a%20Full-Stack%20App%20with%20AI%20Coding%20Assistants.pdf) | Module 2 companion article (frontend-first, OpenAPI contract, FastAPI backend, SQLite persistence) |
+| [`04…Reusable Skills and Specialized Subagents.pdf`](../docs/course_KB/04Alexey%20On%20Data%20-%20Coding%20Agent%20Building%20Blocks_%20Reusable%20Skills%20and%20Specialized%20Subagents.pdf) | Module 5 companion article (skills, subagents, orchestration, worktrees, parallelism) |
+| [`05…Deploy a Full-Stack App….pdf`](../docs/course_KB/05Alexey%20On%20Data%20-%20Deploy%20a%20Full-Stack%20App%20with%20AI%20Coding%20Assistants.pdf) | Module 3 companion article (containerization, Postgres, integration/E2E tests, AWS, CI/CD with OIDC) |
+| [`06…DevOps and Observability….pdf`](../docs/course_KB/06Alexey%20On%20Data%20-%20DevOps%20and%20Observability%20for%20an%20AI-Built%20App.pdf) | Module 4 companion article (dev/prod, registry-pinned images, OpenTelemetry, alerts, AI on-call) |
+| [`07use-claude-code-like-a-pro-webinar/`](../docs/course_KB/07use-claude-code-like-a-pro-webinar/) | External webinar (README + full worksheet): ADLC, layered context, subagent team, hooks, `/task`, `/loop`, MCP, plugins, token-usage tooling |
+| [`project_requirements.html`](../docs/course_KB/project_requirements.html) | Local snapshot of the DataTalks.Club docs "Project" page |
+| [`project_rubric_2026.url`](../docs/course_KB/project_rubric_2026.url) | Internet shortcut → course repo `project/` folder |
 
 **Online sources resolved during this discovery:**
 
