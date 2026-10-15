@@ -10,10 +10,28 @@ See `_docs/2025-baseline-vs-2026-opportunities.md` before making significant pla
 
 ## Development Commands
 
-Use `uv` for Python dependency management. Useful commands:
+Use `uv` for Python dependency management and `npm` for JavaScript. Useful commands:
 
-- `uv sync`
+Root:
+
+- `npm install` — install root dev dependencies (`concurrently`)
+- `npm run dev` — start frontend and backend dev servers together
+- `npm run dev:frontend` — start the Vite dev server only
+- `npm run dev:backend` — start uvicorn with reload only
+- `npm run build` — type-check and build the frontend (`tsc && vite build`)
+
+Frontend (`cd frontend`):
+
+- `npm install`
+- `npm run dev` — Vite dev server on http://localhost:5173
+- `npm run build` — production build into `frontend/dist/`
+
+Backend (`cd backend`):
+
+- `uv sync` — install backend dependencies into `backend/.venv`
 - `uv add <PACKAGE-NAME>`
+- `uv run uvicorn app.main:app` — serve the API on http://127.0.0.1:8000
+- `uv run pytest`
 - `uv run python <PYTHON-FILE>`
 
 Regularly commit code to Git.
