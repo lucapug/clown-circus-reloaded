@@ -23,6 +23,8 @@ Add verified commands for other components as the project evolves.
 ## Project Documents
 
 - `_docs/process.md` — working principles and development methodology. Consult before planning or significant development work.
+- `_docs/plan.md` — agreed project plan: decisions, rubric mapping, milestones, checkpoints.
+- `_docs/backlog.md` — read-only Mermaid map of the issue dependency DAG. GitHub Issues are the canonical backlog; update the map when issues change.
 - `_docs/diary.md` — chronological record of activities, decisions, verification, and lessons learned. Update at significant milestones.
 - `_docs/2025-baseline-vs-2026-opportunities.md` — discovery findings and development opportunities.
 - `docs/course_KB/` — original course materials and reference documents. Consult relevant sources when applying course methodologies.

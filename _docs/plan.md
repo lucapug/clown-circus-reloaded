@@ -80,6 +80,8 @@ Not rubric-mandated (experiment/polisH): OTel depth beyond diagnosis needs, two-
 
 ## 6. Milestones, checkpoints, and cut list
 
+The groomed backlog and its dependency DAG are diagrammed in [`backlog.md`](backlog.md) (read-only view; GitHub Issues remain canonical, D2).
+
 MoSCoW: **MUST** = rubric-critical; **SHOULD** = high value with defined fallback; **COULD** = cut without endangering submission; **WONT(v1)** = deferred to the second attempt by decision.
 
 | ID | Dates | Milestone | Tiering |
