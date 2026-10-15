@@ -147,4 +147,28 @@ PM 278,240 · engineer stall (attempt 1, no usage reported) · engineer escalati
 
 Owner reviews and merges PR #12 (the only remaining act of this cycle; #1 auto-closes via "Closes #1"). After merge: remove the `in-progress` label, start the #3 cycle, then #2.
 
+## 2026-10-15 — Post-cycle tuning analysis (owner-requested) after merging PR #12
+
+### What and why
+
+The owner merged PR #12 (#1 auto-closed; `in-progress` label removed by the orchestrator — label management at cycle boundaries is now an orchestrator duty, proposed in the tuning doc §5). Before cycle #3, the owner requested a tuning review of the graph loop using the first-cycle ledger as evidence, with explicit constraints: no weakening of independent verdicts, no scope/spec changes, nothing implemented before approval.
+
+### How
+
+Evidence gathered: the cycle-1 diary ledger (~6.67M subagent tokens; decomposition per pass), the PR #12 thread, a live `ListModels` check, and verification of issue #2's body. Output: [`_docs/graph-tuning.md`](graph-tuning.md) — findings labeled confirmed vs hypothesis, proposals P1 (role files, context diet, engineer smoke-only, mini-agent rework, escalation protocol, reliability clauses), P2 (optional experiments), P3 (workflow-based model assignment, later), a measurement plan for the next cycle with targets and a verdict-integrity checklist, and an owner approval checklist.
+
+**Confirmed constraints discovered:** `GLM-5.3-Flash` exists in the plan but the Agent tool exposes no per-call model parameter, and the read-only `Explore` type maps to an unavailable model — per-role model selection is unreachable today; the dynamic-workflows `subagent_model` is the migration path (deferred to an M5/M6 pilot).
+
+**Dependency reconciliation (applied — factual, not tuning):** issue #2's Docker-build job needs #3's Dockerfile; issue #2's `Depends on` updated to #3, and `_docs/backlog.md` (edge `#3 → #2`, parallelism notes, #1 merged marker) updated accordingly. Next cycle is therefore #3.
+
+### Lessons
+
+- The measure-then-evaluate loop the plan mandates is already paying for itself: every proposal in the tuning doc traces to a measured number or a documented incident, not to taste.
+- The two biggest confirmed wastes were *process*, not models: duplicated full verification (engineer + QA) and resume-cost on surgical fixes — both fixable without touching verdict independence.
+
+### Next
+
+Owner approves/adjusts the P1 package (and P2/P3 dispositions); the #3 cycle then runs with the approved tuning and is measured against the §4 plan.
+
+
 
