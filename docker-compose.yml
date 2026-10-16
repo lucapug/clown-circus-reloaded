@@ -1,0 +1,41 @@
+# Local development stack for Clown Circus Reloaded (issue #3).
+# Credentials below are dev-only placeholders; do not reuse them anywhere.
+
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://clown:clown@db:5432/clowncircus # dev-only
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: clown # dev-only
+      POSTGRES_PASSWORD: clown # dev-only
+      POSTGRES_DB: clowncircus
+    volumes:
+      - clowncircus-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clown -d clowncircus"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  clowncircus-db:
