@@ -1,0 +1,18 @@
+# VCS / project docs
+.git
+.agents
+_docs
+docs
+
+# Node
+**/node_modules
+frontend/dist
+
+# Python
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/*.pyc
+
+# OS
+.DS_Store

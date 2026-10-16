@@ -11,3 +11,17 @@ The 2025 implementation will serve as a reference and baseline. The game may evo
 **The project combines two goals:** delivering a successful capstone that meets the course requirements and evaluation rubric, and deepening my practical understanding of AI-native software engineering by applying and evaluating the methodologies presented in the course.
 
 A project diary will document the development process, linking significant engineering decisions and applied techniques to the relevant course materials.
+
+## Run with Docker Compose
+
+Requires [Docker](https://docs.docker.com/get-docker/). This builds the frontend, starts PostgreSQL 15, and serves the API plus the built frontend from a single container on <http://localhost:8000>:
+
+```bash
+docker compose up -d --build
+curl http://localhost:8000/health   # -> {"status":"ok"}
+```
+
+- The app serves the built frontend with an SPA fallback; the API docs are at <http://localhost:8000/docs>.
+- The `db` service uses dev-only credentials (`clown:clown`, database `clowncircus`); data persists in the `clowncircus-db` named volume.
+- Without `DATABASE_URL` set, the app defaults to a local (ephemeral inside the container) SQLite database.
+- Stop and remove everything, including the database volume: `docker compose down -v`
