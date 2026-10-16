@@ -1,6 +1,6 @@
 # Graph Loop Tuning — Analysis and Proposal after Cycle #1
 
-**Status:** Proposal — awaiting owner approval. No tuning change has been implemented yet.
+**Status:** P1 applied in cycle #3 (2026-10-16) and measured (§6). Consolidation into `process.md` awaits an explicit owner decision (§6.5).
 **Date:** 2026-10-15.
 **Evidence base:** the first-cycle diary entry (issue #1, PR #12), the PR #12 comment thread (PM brief, QA verdict, two reviewer verdicts), harness-reported subagent usage, and a live `ListModels` check (2026-10-15).
 **Constraints honored:** independent QA/reviewer verdicts preserved; lifecycle unchanged (engineer never closes, QA never fixes, orchestrator closes only after PASS, human merges); product scope and approved spec untouched.
@@ -78,3 +78,58 @@ Record in the diary, side by side with the baseline: per-pass tokens, tool uses,
 2. P2 experiments enabled or deferred?
 3. P3 direction acknowledged (no action now)?
 4. Orchestrator manages the `in-progress` label at cycle boundaries from now on (added at start, removed at merge)?
+
+**Owner decisions (2026-10-16):** P1.1–P1.6 approved and applied in cycle #3; P2 deferred; P3 no migration (model observation only); label management by the orchestrator approved.
+
+---
+
+## 6. Cycle #3 results (2026-10-16) — measured vs baseline
+
+**Confounders declared up front [C]:** (a) session model switched by the owner from `GLM-5.3` (reasoning max) in cycle #1 to `GLM-5.3-Flash` in cycle #3; (b) scope differs — #1: 27 files / ~306 hand-written lines / 5 commits; #3: 7 files / 5 commits (3 + 2 rework), Docker-centric; (c) cycle #1 included a Dockerless scaffold with heavy registry research. No reliable normalization exists across these; per-pass comparisons below are indicative, not controlled.
+
+### 6.1 Ledger (harness-reported subagent usage)
+
+| Pass | #1 tokens | #3 tokens | #3 tool uses | #3 duration | Outcome |
+|---|---|---|---|---|---|
+| PM brief | 278,240 | 179,551 | 10 | 5.3 min | brief + 1 open question (non-blocking) |
+| Engineer stall | unmeasured | — | — | — | **none** |
+| Engineer escalation | 683,584 | — | — | — | **none** |
+| Engineer implementation | 3,151,203 | 460,117 | 28 | 11.4 min | PR #13, smoke-only (P1.3) |
+| QA full battery | 1,499,404 | 533,389 | 33 | 7.9 min | PASS 8/8 + guardrails |
+| Reviewer (fallback `general-purpose`) | 320,609 | 243,311 | 12 | 5.2 min | REQUEST_CHANGES, 2 [minor] |
+| Rework | 520,003 (engineer resume) | 253,005 (**mini-agent**, P1.4) | 18 | 4.6 min | uv pinned 0.9.30; +3 tests; 7 passed |
+| Reviewer close-out | 216,010 | 152,796 | 4 | 1.7 min | APPROVE |
+| QA rework re-check | — (not done in #1) | 219,887 | 7 | 3.4 min | PASS (image + tests re-verified) |
+| **Total** | **≈ 6.67M** | **≈ 2.04M** | 112 | ≈ 39.5 min | all independent gates green |
+
+Note on the extra pass: cycle #3 added a QA rework re-check that cycle #1 skipped (the #1 rework was a file deletion with no runtime effect; the #3 rework changed the runtime image). This is a *verification increase*, counted honestly in the total.
+
+### 6.2 Against the §4 targets
+
+| Target | Result | Met |
+|---|---|---|
+| Total ≤ 3.5M | 2.04M | ✅ |
+| Engineer pass ≤ 2M | 0.46M | ✅ |
+| Zero stalls | 0 stalls, 0 escalations | ✅ |
+| Verdict-integrity checklist | QA full independent re-run ✅ · reviewer diff-only, formed before reading QA ✅ (stated in its verdict) · FAIL edge → mini-agent within P1.4 limits, re-verified by both reviewer and QA ✅ · human merges ✅ | ✅ |
+
+### 6.3 Interpretation (separated from measurements)
+
+- **[C]** Both process incidents of cycle #1 (interactive-prompt stall; unbounded research pass) did not recur; the role files carried the anti-hang and escalation rules without per-prompt re-authoring.
+- **[C]** The duplicated full verification (engineer + QA) was removed; QA's battery was unchanged (8/8 + guardrails) and caught nothing less — the reviewer still found two real [minor] issues the engineer had disclosed partially (uv `:latest`) or missed (untested env path).
+- **[C]** Mini-agent rework cost 253k vs 520k for the engineer resume in #1 — and the fix passed both independent re-verifications. Caveat: #3's rework was two fixes vs one; per-fix cost is lower still.
+- **[H]** How much of the −69% total is tuning vs Flash vs scope cannot be isolated from one cycle. A within-model comparison (next cycle on the same model, or a repeat of a comparable issue on GLM-5.3) is the only way to attribute. Hypothesis: the structural savings (no duplicated battery, no resume cost, no stalls) are model-independent; the per-pass token levels are partly model-dependent.
+- **[C] Quality signal:** Flash produced a correct, complete implementation with honest deviation disclosure, and reviewer/QA on Flash found real defects. No quality regression observed in this cycle; one cycle is not a trend.
+
+### 6.4 Subagent model configuration — verified vs declared
+
+- **Verified:** session model `GLM-5.3-Flash` (`ListModels` `[current]`). The `Explore` subagent type fails with `model-not-found; selection=…/GLM-5-Turbo` — a model absent from the plan. The owner reports that the harness settings let `Explore` be assigned "inherit" or one of the two GLM-5.3 models: the error therefore reflects a **settings value**, not a harness limitation (correcting §A4's earlier interpretation). Fix is owner-side; not changed by the orchestrator per mandate.
+- **Self-reported, unverified:** PM, engineer, QA, reviewer, mini-agent all self-reported `GLM-5.3-Flash`. Consistent with "general-purpose inherits the session model", but the harness exposes no per-agent model/reasoning-level readout to the orchestrator; **effective model and reasoning level for subagents remain an observability limit**.
+
+### 6.5 Proposals arising (not applied — owner decision required)
+
+1. **Consolidate into `process.md`** (evidence: zero incidents, targets met, verdict integrity intact): role files as the standing role definitions; engineer smoke-only + QA full battery; early-escalation protocol; orchestrator-managed `in-progress` label. **Keep experimental:** mini-agent rework (one data point; keep the P1.4 limits and diary logging); reviewer fallback policy (until `Explore` settings are fixed). **Defer:** P2 items unchanged.
+2. **Settings action (owner):** set `Explore` to "inherit" or a valid GLM-5.3 model so the read-only subagent type becomes usable — then the reviewer can run under a structural read-only type instead of an instruction-level wall.
+3. **Open question from the PM brief:** backend signal via startup log only (current) vs an HTTP-visible field — decide before M3 freezes `openapi.yaml`; M4 health validation may want it.
+4. **uv line:** 0.9.30 is the last 0.9.x (uv is at 0.13.x); a deliberate bump is a candidate for M3 when the DB layer lands, not now.
+

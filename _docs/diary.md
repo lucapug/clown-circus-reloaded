@@ -170,5 +170,49 @@ Evidence gathered: the cycle-1 diary ledger (~6.67M subagent tokens; decompositi
 
 Owner approves/adjusts the P1 package (and P2/P3 dispositions); the #3 cycle then runs with the approved tuning and is measured against the §4 plan.
 
+## 2026-10-16 — Cycle #3 (issue #3, PR #13): tuned graph loop, measured against the #1 baseline
+
+### What and why
+
+Second full graph cycle, first under the approved tuning package (P1.1–P1.6 of [`graph-tuning.md`](graph-tuning.md)); P2 deferred and P3 (no model-assignment migration) per the owner's decisions of this morning. Issue #3 delivers the single-container Dockerfile and the Compose stack with Postgres 15 (rubric #8), plus `DATABASE_URL` configuration plumbing and SPA serving of `frontend/dist`.
+
+### Session and model configuration (declared vs verified)
+
+- **Verified:** main session on `GLM-5.3-Flash` (`ListModels` → `[current]`), switched manually by the owner from `GLM-5.3` (reasoning max) used in cycle #1. Declared as a **confounding variable** for every comparison below.
+- **Verified:** the `Explore` subagent type fails with `model-not-found; selection=…/GLM-5-Turbo`. The owner reports the settings allow `Explore` to be assigned "inherit" / GLM-5.3 / GLM-5.3-Flash — the failure is a settings value, correctable by the owner (not changed by the orchestrator per mandate). The reviewer ran as `general-purpose` under an instruction-level read-only wall (P1.6 fallback), both times.
+- **Self-reported, unverified:** all five subagents (PM, engineer, QA, reviewer, mini-agent) reported `GLM-5.3-Flash`. Consistent with inheritance; the harness exposes no per-agent model or reasoning-level readout, so **effective subagent configuration is an observability limit**, recorded as such.
+
+### Process changes actually applied
+
+- **P1.1** role files committed before the cycle (`.agents/agents/{pm,engineer,qa,reviewer}.md`, commit `503e725`) — Module 5 convention (KB 04); also the extension pack's subagent artifact.
+- **P1.2** cycle prompts carried only issue/PR numbers, the branch, cycle-specific nuances, and section pointers; roles read the brief, not the docs tree.
+- **P1.3** engineer ran smoke only (pytest, image build, one `/health` curl, backend log grep, `compose down -v`); QA ran the **full** 8-check battery + guardrails independently.
+- **P1.4** mini-agent used once for two `[minor]` reviewer findings (mechanical: pin uv image tag; add env-path tests) — 253k tokens, 18 tool uses, 4.6 min; both fixes passed the reviewer's rework verification and QA's targeted re-check. Within the authorized limits; no architectural implications.
+- **P1.5/P1.6** no escalation needed; no stall; fallback for `Explore` applied once and recorded.
+- Label management at cycle boundaries by the orchestrator (`in-progress` added at start; removal at merge).
+
+### Outcome and independent verdicts
+
+[PR #13](https://github.com/lucapug/clown-circus-reloaded/pull/13) — 5 commits (3 + 2 rework), 7 files. [QA VERDICT: PASS](https://github.com/lucapug/clown-circus-reloaded/pull/13#issuecomment-6218302675) 8/8 + guardrails; [REVIEW: REQUEST_CHANGES](https://github.com/lucapug/clown-circus-reloaded/pull/13#issuecomment-6218409910) (2 minor, 0 major) → mini-agent rework (`f0fbae9`, `4e6f5bc`) → [REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/13#issuecomment-6218569316) and [QA VERDICT (rework): PASS](https://github.com/lucapug/clown-circus-reloaded/pull/13#issuecomment-6218601332). Merge pending the owner. The reviewer stated it formed its findings before reading QA's verdict (independence rule).
+
+### Measured ledger (subagent tokens; full table in `graph-tuning.md` §6.1)
+
+PM 179,551 · engineer 460,117 · QA 533,389 · reviewer 243,311 · mini-agent 253,005 · reviewer close-out 152,796 · QA re-check 219,887 → **≈ 2.04M** (baseline #1: ≈ 6.67M). Tool uses 112 (vs 176); agent time ≈ 39.5 min (vs ≈ 100). Stalls 0 (vs 1); escalations 0 (vs 1); rework loops 1 (= #1); owner interventions during the cycle: none required (one PM open question deferred as non-blocking). Targets (≤ 3.5M total, engineer ≤ 2M, zero stalls): all met.
+
+### Interpretation (kept separate from measurements)
+
+- Confirmed: the two cycle-#1 incident classes did not recur; duplicated verification was removed with QA's battery unchanged; the reviewer still caught two real defects (so the tuned loop did not get blinder).
+- Hypothesis: the −69% total cannot be attributed between tuning, Flash, and the smaller scope from one cycle. Structural savings (no duplicate battery, no resume cost, no stalls) are plausibly model-independent; per-pass token levels are plausibly model-dependent. A within-model comparison on a comparable issue is the clean next test.
+- Quality: no regression observed on Flash in this cycle (correct implementation, honest deviations, defects found by the independent readers). One cycle is not a trend.
+
+### Proposals (not applied — owner decision required)
+
+See `graph-tuning.md` §6.5: consolidate into `process.md` (role files; smoke-only + full QA; escalation protocol; label management); keep mini-agent and reviewer fallback experimental; fix `Explore` settings owner-side; decide the backend-signal shape (log vs HTTP) before M3; consider a deliberate uv bump at M3. `process.md` is unchanged.
+
+### Next
+
+Owner reviews/merges PR #13 (#3 closes; label removed by the orchestrator). Next cycle: #2 (CI), now unblocked by the Dockerfile; #4 and #5 follow.
+
+
 
 
