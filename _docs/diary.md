@@ -215,6 +215,9 @@ Owner reviews/merges PR #13 (#3 closes; label removed by the orchestrator). Next
 
 **Update (same day):** owner merged PR #13 (`0af88c0`) after own verification; #3 closed, `in-progress` removed by the orchestrator, branch deleted. Owner decisions on the tuning proposals recorded in `graph-tuning.md` §6.6 (consolidate role files; mini-agent one more experimental trial; `Explore` reassigned to GLM-5.2 for the next cycle's reviewer; dependency policy: prefer recent compatible versions over 2025 pins, uv 0.13.x candidate for M3). Draft `process.md` amendment in `graph-tuning.md` §7 — awaiting explicit text approval; `process.md` unchanged.
 
+**End of day — priority for 2026-10-17 (owner):** the 2026 project rubric moved from *draft* to **final** today. Before any further backlog work, re-read the source page carefully (`DataTalksClub/ai-dev-tools-zoomcamp/project/README.md`; last verified 2026-10-15 at 14 criteria / 30 points), diff it against plan §4's rubric mapping and the expected repository contents, and propose plan amendments if anything changed. This is the "re-check before submission" task the plan scheduled (M0/M7), pulled forward by the final publication.
+
+
 
 
 
