@@ -9,7 +9,7 @@ graph TD
     subgraph M1["M1 — Walking skeleton + early pipeline (Oct 16–17)"]
         I1["#1 Scaffold monorepo ✅ merged"]
     I2["#2 CI on PRs"]
-    I3["#3 Dockerfile + Compose"]
+        I3["#3 Dockerfile + Compose ✅ merged"]
     I4["#4 OTel scaffold (dormant)"]
     I5["#5 Dev deploy Render + Neon"]
     end
