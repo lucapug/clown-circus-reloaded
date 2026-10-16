@@ -133,3 +133,22 @@ Note on the extra pass: cycle #3 added a QA rework re-check that cycle #1 skippe
 3. **Open question from the PM brief:** backend signal via startup log only (current) vs an HTTP-visible field — decide before M3 freezes `openapi.yaml`; M4 health validation may want it.
 4. **uv line:** 0.9.30 is the last 0.9.x (uv is at 0.13.x); a deliberate bump is a candidate for M3 when the DB layer lands, not now.
 
+### 6.6 Owner decisions on §6.5 (2026-10-16, before the PR #13 merge)
+
+- **(1) Consolidation:** role definitions (PM, engineer, QA, reviewer as `.agents/agents/*.md`) → **consolidate** into `process.md`. **Mini-agent** → stays **experimental**: one more trial on small fixes in a new cycle before any permanent adoption. (Orchestrator proposal draft for the `process.md` wording: §7 below — still requires explicit approval of the text.)
+- **(2) `Explore` settings:** owner reassigned the built-in Explore subagent to an existing model (**GLM-5.2**). Next cycle: relaunch the reviewer via `Explore` in parallel with QA; outcome recorded (the model differs from the session's Flash — a per-role model assignment in practice, to be noted in the ledger as such, self-report still unverified).
+- **(4) Dependency policy:** uv bump to the 0.13.x line approved as a **deliberate M3 candidate**. Generalized by the owner into a policy proposal: for dependencies inherited from the 2025 capstone with old pinned versions, prefer recent versions **when compatible and not disruptive**. Orchestrator note: the backend already runs **FastAPI 0.143.2** (resolved in cycle #1 under the component-parity ratification), so native OpenTelemetry is already available for issue #4; the policy is forward-looking for M3 (SQLAlchemy line, httpx/starlette TestClient path) and the frontend lines (kept on 2025 majors by design — Tailwind 3 / React 18 / Vite 5 — any bump there is a separate, explicit decision).
+- **(3)** backend-signal shape: still open; decide before M3 freezes `openapi.yaml`.
+
+## 7. Draft `process.md` amendment (text for owner approval — NOT applied)
+
+Proposed new section **"8. Graph Loop Roles"** appended to `_docs/process.md`:
+
+> Implementation work flows through the PM → engineer → QA (+ reviewer) graph. The standing role definitions live in `.agents/agents/{pm,engineer,qa,reviewer}.md` and are authoritative for each role's boundaries, procedure, anti-hang rules, escalation protocol, and verdict formats; cycle prompts carry only issue/PR identifiers, the branch, and cycle-specific deltas. The PM brief is the single source of truth of a cycle. The engineer verifies by smoke only; QA runs the full Definition-of-Done battery independently; the reviewer reviews the diff independently and forms its verdict before reading QA's. Findings route back to the engineer; neither QA nor the orchestrator fixes code. The orchestrator (main session) manages the `in-progress` label at cycle boundaries and records per-cycle usage in the diary. The human merges.
+>
+> Experimental (diary-logged, not yet standing): mini-agent rework for small mechanical findings within the limits recorded in `_docs/graph-tuning.md` P1.4.
+>
+> Dependency policy: components stay on the 2025 architecture; versions are not pinned to 2025 — prefer recent, compatible versions when they do not disrupt the project, with bumps decided explicitly per milestone (uv → 0.13.x line candidate for M3).
+
+Apply only after the owner approves this text (or an edited version).
+
