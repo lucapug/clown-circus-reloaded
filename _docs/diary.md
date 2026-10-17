@@ -295,6 +295,8 @@ PM 214,594 · engineer 903,620 (higher than #3's 460k — CI-iteration waits and
 
 Owner reviews/merges PR #14 (#2 closes; label removed by the orchestrator). Then #4 (OTel, upgraded AC) and #5 (dev deploy Render+Neon — owner-side account creation can start in parallel).
 
+**Update (same day):** owner merged PR #14 (`a6d216e`) after own review (including the Vitest-placeholder question — answered: deliberate scope decision; the `--passWithNoTests` flag will be removed in #6's first real-test commit so "no tests found" fails again). #2 closed, label removed, branch deleted, backlog map updated. M1 progress: 3 of 5 issues merged (#1, #3, #2); remaining #4 (OTel) and #5 (dev deploy).
+
 
 
 
