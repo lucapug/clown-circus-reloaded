@@ -1,3 +1,4 @@
+[![CI](https://github.com/lucapug/clown-circus-reloaded/actions/workflows/ci.yml/badge.svg)](https://github.com/lucapug/clown-circus-reloaded/actions/workflows/ci.yml)
 # Clown Circus Reloaded
 
 **Clown Circus Reloaded** is a brownfield reimplementation of [Clown Circus Carnival](https://github.com/lucapug/clown-circus-carnival), my 2025 capstone project for the first edition of the AI Dev Tools Zoomcamp.
