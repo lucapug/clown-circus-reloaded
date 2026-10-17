@@ -217,6 +217,38 @@ Owner reviews/merges PR #13 (#3 closes; label removed by the orchestrator). Next
 
 **End of day — priority for 2026-10-17 (owner):** the 2026 project rubric moved from *draft* to **final** today. Before any further backlog work, re-read the source page carefully (`DataTalksClub/ai-dev-tools-zoomcamp/project/README.md`; last verified 2026-10-15 at 14 criteria / 30 points), diff it against plan §4's rubric mapping and the expected repository contents, and propose plan amendments if anything changed. This is the "re-check before submission" task the plan scheduled (M0/M7), pulled forward by the final publication.
 
+## 2026-10-17 — Final 2026 rubric analysis (source re-read; plan amendments proposed, not applied)
+
+### Method
+
+Fetched the final page from the source repo and diffed it against the draft captured on 2026-10-15 (plan §4 mapping built on that draft). Repo visibility verified (`gh repo view` → `private`). No plan or spec file modified — amendments proposed to the owner.
+
+### Draft → final diff (facts)
+
+- **Shape:** 14 criteria / 30 points → **12 criteria / 24 points, pass at 10** ("You do not have to score full marks on every criterion"). Deadlines live on the course platform; "roughly 20 hours of work spread across the second month"; second attempt = same project, same criteria. Peer review of 3 projects mandatory ("submitting without doing the peer reviews does not pass").
+- **Removed as separate criteria:** Frontend (3), API Contract (2), Backend (3), Database Integration (2), Integration Testing (2, folded into Testing), AI-Assisted Development Workflow, Technologies & Architecture, Agent Extension Pack, Security/Audit/DevOps Hardening, Reproducibility. **The expected-repository-contents list (directories like `agent-capabilities/`, `security/`, `ops/`) is gone entirely.**
+- **Added:** **Product Specification (0–2)** — spec + *"publicly accessible task tracker"* whose tasks define acceptance criteria **and evidence that the agents used the tracker**; **Agent Team Specification (0–2)** — team + how they work together; **Context Management (0–2)** — AGENTS.md pointing to modular docs; **Observability (0–2)** — a key user journey with **metrics + traces + structured logs sharing a trace ID**, no customer data or credentials in telemetry, collected and viewable in a UI; **Alerting on User Impact (0–1)** — at least one alert; **On-Call Agent (0–2)** — "an agent wakes up on an alert and fixes the issue".
+- **Reshaped:** **CI/CD is now 0–3** — CI tests on PRs (1), CD auto-deploys (2), **CD to dev + manual deploy to production (3)**. Application (0–2) requires full-stack end-to-end *and* "runs locally with a single command". Testing (0–2) requires **both unit and integration**, single command, passing. Containerization (0–2) requires the full system including DB via Compose, single command.
+
+### Impact on our plan (analysis)
+
+- **Ops is no longer a paced experiment — it is 5 graded points** (Observability 2 + Alerting 1 + On-Call 2). Our D7/D8 were built exactly for this, but the C1 cut list (downgrade drill to tier 2; reduce alerts) and the M5 SHOULD tiering now directly sacrifice points. **Amendment proposed:** M5 becomes rubric-critical (MUST): correlated-signature instrumentation (FastAPI native OTel already available, issue #4), one user-journey trace (submit-score), 1+ actionable alert, on-call agent tier 1 in dev. New hard requirement: **no customer data (leaderboard names!) or credentials in any telemetry signal** — mask/omit in spans, attributes, logs.
+- **CI/CD 3-point level = exactly our D6 architecture** (dev CD + manual prod promotion). No change needed — it was already the plan; the rollback path now feeds this criterion's spirit.
+- **Public task tracker:** our GitHub Issues satisfy "tasks with acceptance criteria + evidence agents used the tracker" (groomed bodies, agent comments, PR cross-refs), but the repo is **private** → not publicly accessible → max 1/2 on that criterion. **Owner decision needed:** make the repo public (also eases Deployment evidence and peer review) or accept 1/2. Recommendation: go public — nothing in the repo is sensitive (no secrets; dev-only compose credentials are standard placeholder literals).
+- **Agent-workflow documentation now carries 6 points** (Product Spec 2 + Agent Team 2 + Context 2). We are structurally ahead: `.agents/agents/*.md` role files + graph lifecycle = Agent Team evidence; AGENTS.md → `_docs/*` = Context Management; the draft `process.md` §8 amendment makes the team documentation explicit and should be approved soon.
+- **Dropped criteria ≠ dropped work:** frontend/backend/API/DB quality still feed Application (2); the security layer (scanners in #2, audits, tool/data policy) is no longer a graded category — keep it at planned scale (it is cheap, feeds "no credentials in telemetry", and remains good practice) but it no longer justifies extra depth. The extension-pack-style artifacts (permissions notes, hooks) stay because they evidence Agent Team/Context, not for a dedicated criterion.
+- **Derisking:** pass bar is 10/24; with the amendments our realistic ceiling is ~22–24. Deadline remains owner-stated 2026-10-26.
+
+### Proposed plan amendments (pending owner approval)
+
+1. Rewrite plan §4 (rubric mapping) to the final 12-criterion table; note 24 pts / pass 10.
+2. M5 re-tiered MUST for Observability + Alerting + On-call tier 1; security layer kept at planned scope, explicitly non-graded.
+3. C1 cut list revised: remove items 2 and 4 (they now cost points); replacement cuts: extended E2E scenarios, contract-drift automation, local observability stack (unchanged), Grafana dashboard depth beyond the key journey.
+4. New D11 decision (owner): repo public vs private (recommendation: public).
+5. Prioritize approving `process.md` §8 (Agent Team evidence) and keep the planned `docs/permissions.md`-style notes as Agent Team documentation.
+6. Add to D7/issue #4 acceptance criteria: trace-ID correlation across a user journey + zero customer data in telemetry.
+
+
 
 
 
