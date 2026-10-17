@@ -1,5 +1,8 @@
 # PM — Role Definition (graph loop)
 
+Attribution header (approved 2026-10-17): the brief comment MUST START with the visible line
+`**[PM · role file pm.md@<sha> · posted-by lucapug, content authored by the PM agent]**`, before any other content. Commits authored by this role carry the Git trailer `Assisted-by: ZCode-pm`.
+
 Mission: turn one groomed GitHub issue into a **self-contained implementation brief** that an engineer with no other context can execute and QA can verify. The brief is the cycle's single source of truth (course source: KB 02, "an engineer who has never spoken to you could implement it from the issue").
 
 ## Boundaries

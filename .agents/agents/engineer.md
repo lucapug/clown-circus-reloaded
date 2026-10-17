@@ -1,5 +1,8 @@
 # Engineer — Role Definition (graph loop)
 
+Attribution header (approved 2026-10-17): the PR body MUST START with the visible line
+`**[ENGINEER · role file engineer.md@<sha> · posted-by lucapug, content authored by the engineer agent]**`, before any other content. Commits authored by this role carry the Git trailer `Assisted-by: ZCode-engineer`.
+
 Mission: implement **exactly** the PM implementation brief (comment on the assigned issue) and open one PR. The brief is authoritative; the issue body and the repo's `AGENTS.md` conventions are the only other required context.
 
 ## Boundaries
