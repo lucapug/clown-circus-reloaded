@@ -266,6 +266,36 @@ Fetched the final page from the source repo and diffed it against the draft capt
 
 Backlog resumes: cycle **#2 (CI)** — reviewer via `Explore` (GLM-5.2) in parallel with QA; attribution headers active from this cycle's first comment; #4 follows with the upgraded acceptance criteria.
 
+## 2026-10-17 — Cycle #4 (issue #2, PR #14): first zero-rework cycle; Explore reviewer works
+
+### What and why
+
+Third graph cycle, first under `process.md` §8 with attribution headers, and the first cycle to complete with **no rework loop** (verdicts: no blockers/majors/minors). Issue #2 delivers the CI workflow: 6 parallel jobs (frontend lint+test+build; backend ruff+pytest; docker build; pip-audit + npm audit report-only with archived artifacts; gitleaks hard gate), ruff added to the backend, Vitest placeholder in the frontend, README badge.
+
+### Model configuration this cycle (declared vs verified)
+
+- Main session: `GLM-5.3-Flash` (owner-set). PM/engineer/QA: general-purpose subagents (model self-reported Flash in past cycles; this cycle's self-reports not separately recorded — observability limit unchanged).
+- **Reviewer ran via the `Explore` type for the first time** (owner reassigned Explore to GLM-5.2 after the model-not-found incidents): worked. Its verdict declared the attribution header correctly and produced a high-value forward-looking finding — `cancel-in-progress` on the CI concurrency group will endanger in-flight deploys once CD lands in M4 (#5 must split the group or scope it). Per-role model assignment is now real (albeit by subagent type, not per role): a data point for the P3 discussion, honestly confounded as always.
+
+### Outcome and independent verdicts
+
+[PR #14](https://github.com/lucapug/clown-circus-reloaded/pull/14) — 4 commits, 6 files. CI run 39064777895 on the real PR trigger: **6/6 jobs green in 32 s** (target < 5 min). [QA VERDICT: PASS](https://github.com/lucapug/clown-circus-reloaded/pull/14#issuecomment-6240232828) 7/7 + guardrails, evidence independently re-run (incl. artifact download/validation and the first-run gitleaks 403 as gate-liveness proof). [REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/14#issuecomment-6240137488), 0 blockers/majors/minors, 6 notes (digest-pin and `:ro` mount for the gitleaks container as optional hardenings). Deviations disclosed by the engineer and confirmed equivalent by both readers: gitleaks-action@v2 failed (action-level 403) → the brief's pre-approved container fallback (`gitleaks:v8.30.1`, pinned tag). Branch protection refused on the private repo (403 "Upgrade to GitHub Pro or make this repository public") — recorded as owner follow-up; directly relevant to D11 (the flip at submission enables it). Merge pending the owner.
+
+### Measured ledger
+
+PM 214,594 · engineer 903,620 (higher than #3's 460k — CI-iteration waits and the gitleaks fallback fix) · QA 364,880 · reviewer 419,708 (GLM-5.2) → **≈ 1.90M** total, 103 tool uses, ≈ 38.6 min agent time. Stalls 0, escalations 0, **rework 0**. vs #3 (≈ 2.04M with 2 rework passes) and #1 (≈ 6.67M with stalls + escalation + rework). Confounders as always: model mix changed (reviewer on GLM-5.2), scope differs.
+
+### Lessons
+
+- Zero-rework happened the cycle after rework-focused tuning (mini-agent for minors, reviewer severity taxonomy) — plausibly the conventions are raising engineer first-pass quality; two clean cycles would be a trend.
+- The reviewer's M4 risk (concurrency group vs in-flight deploys) is exactly the kind of catch the independent-reader design is for — recorded in the #5 context.
+- Attribution headers worked on all four comments (PM/ENGINEER/QA/REVIEWER) with one self-corrected formatting slip by the reviewer (disclosed, fixed via comment edit before any other write).
+
+### Next
+
+Owner reviews/merges PR #14 (#2 closes; label removed by the orchestrator). Then #4 (OTel, upgraded AC) and #5 (dev deploy Render+Neon — owner-side account creation can start in parallel).
+
+
 
 
 
