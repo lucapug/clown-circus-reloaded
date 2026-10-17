@@ -61,3 +61,15 @@ Keep `_docs/diary.md` as a chronological record of significant activities, decis
 - When a correction reveals a reusable lesson, update the relevant project instructions or documentation.
 
 Keep this document concise and update it when the agreed working process changes.
+
+## 8. Graph Loop Roles
+
+Implementation work flows through the PM → engineer → QA (+ reviewer) graph. The standing role definitions live in `.agents/agents/{pm,engineer,qa,reviewer}.md` and are authoritative for each role's boundaries, procedure, anti-hang rules, escalation protocol, and verdict formats; cycle prompts carry only issue/PR identifiers, the branch, and cycle-specific deltas. The PM brief is the single source of truth of a cycle. The engineer verifies by smoke only; QA runs the full Definition-of-Done battery independently; the reviewer reviews the diff independently and forms its verdict before reading QA's. Findings route back to the engineer; neither QA nor the orchestrator fixes code. The orchestrator (main session) manages the `in-progress` label at cycle boundaries and records per-cycle usage in the diary. The human merges.
+
+**Attribution (owner-approved 2026-10-17):** every agent comment on GitHub starts with a visible header — `[ROLE · role file <name>.md@<sha> · posted-by lucapug, content authored by the <role> agent]` — and role-authored commits carry the Git trailer `Assisted-by: ZCode-<role>`. All content is posted through the single owner account; `docs/agent-work-evidence.md` indexes the structural evidence (formats ↔ versioned role files, causal chains with timestamps and SHAs, same-day diary commits).
+
+**Observability tiering (final-rubric alignment 2026-10-17):** minimal instrumentation + export land with issue #4; dashboards, alerts, and the on-call drill are rubric-critical (MUST) in milestone M5. No customer data or credentials may enter any telemetry signal.
+
+Experimental (diary-logged, not yet standing): mini-agent rework for small mechanical findings within the limits recorded in `_docs/graph-tuning.md` P1.4.
+
+Dependency policy: components stay on the 2025 architecture; versions are not pinned to 2025 — prefer recent, compatible versions when they do not disrupt the project, with bumps decided explicitly per milestone (uv → 0.13.x line candidate for M3).

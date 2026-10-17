@@ -1,6 +1,6 @@
 # Plan — Clown Circus Reloaded
 
-**Status:** Agreed (2026-10-15). Revision history: rev 0 draft → rev 1 feasibility-reviewed → agreed after the `bonusJumps` evidence review (§3). Plan approval does not replace the owner's review and approval of the product specification.
+**Status:** Agreed (2026-10-15). Revision history: rev 0 draft → rev 1 feasibility-reviewed → agreed after the `bonusJumps` evidence review (§3) → **rev 2 (2026-10-17): aligned to the FINAL 2026 rubric** — §4 rewritten (12 criteria / 24 pts / pass 10), D11 added, M5 re-tiered MUST, C1 cut list revised, M1/#4 upgraded to minimal active instrumentation, M6/M7 updated. Plan approval does not replace the owner's review and approval of the product specification.
 **Plan date:** 2026-10-15.
 **Inputs:** [`2025-baseline-vs-2026-opportunities.md`](2025-baseline-vs-2026-opportunities.md) (discovery report), [`process.md`](process.md), [`diary.md`](diary.md), the interactive planning session of 2026-10-15, and a live re-check of the 2026 rubric (`DataTalksClub/ai-dev-tools-zoomcamp/project/README.md`, accessed 2026-10-15).
 **Next refinement:** this plan feeds the product specification (`product-spec.md`) and the groomed GitHub-issues backlog; it does not replace them.
@@ -11,7 +11,7 @@
 
 **Dual goal** (from `process.md`): (1) a capstone that scores well against the 2026 rubric; (2) practical, learn-by-doing proficiency in the course's AI-native engineering practices, evaluated honestly rather than adopted blindly.
 
-**Rubric facts (re-verified 2026-10-15, still marked draft):** 14 criteria, max **30** points (the discovery report's "33" is stale) — most criteria 0–2, Frontend and Backend 0–3. Final points also depend on **peer-reviewing other students' projects**. Re-check again before submission (M0 and M7).
+**Rubric facts (FINAL version, verified 2026-10-17):** 12 criteria, max **24** points, **pass at 10** ("You do not have to score full marks on every criterion"). Operations carry 5 points (Observability 2 + Alerting 1 + On-Call Agent 2); CI/CD is 0–3 (top level = CD to dev + manual prod deploy); documentation of spec + agent team + context carries 6 points. Peer review of 3 projects is mandatory. Deadlines live on the course platform (owner-stated first submission: 2026-10-26).
 
 **Constraints:**
 
@@ -36,6 +36,7 @@
 | D8 | **AI on-call drill: real, in dev only — tiered fallback** | Tier 1 (target): agent injects a test-passing bug into dev, real alert fires, on-call agent diagnoses, smallest fix as a PR, human reviews; incident report in the diary. Tier 2 (C1 fallback): ops-triggered incident (service stop/latency) with the same on-call agent loop — still real telemetry and a real diagnosis output. Tier 3: scripted/paper diagnosis. Any tier satisfies rubric #13's "operational diagnosis output"; only tier 1 involves deliberate bug injection, and production is never touched. |
 | D9 | **Security: report early, gate on high** | `pip-audit`, `npm audit`, `gitleaks` in CI from the first increment (trivy on the image is COULD once images stabilize); findings always archived; CI fails on high-severity runtime findings or any secret leak. Recurring AI audits at milestones (in-harness read-only subagent; external strong model when available); AI tool/data policy; agent security notes. |
 | D10 | **Pacing: deadline-driven, 4–6 h/day supervisory** | Milestones work backwards from 2026-10-26 with two explicit checkpoints (§6) and an ordered cut list. |
+| D11 | **Repository visibility: private during development, public at submission** | Owner decision (2026-10-17, per prior-capstone practice). The final rubric's Product Specification criterion requires a *publicly accessible* task tracker with acceptance criteria and agent-usage evidence — our groomed GitHub Issues + [`docs/agent-work-evidence.md`](../docs/agent-work-evidence.md) satisfy it once public. M7 task: flip visibility immediately before submission and pin the SHA. |
 
 **Standing proposals adopted unless amended at review:** stack unchanged from 2025 (React 18 + TS + Vite + Tailwind frontend; FastAPI + Pydantic v2 + SQLAlchemy backend; SQLite locally, Neon Postgres in cloud); `frontend/` + `backend/` monorepo; 2025 repo accessed by clone-on-demand with the inspected SHA pinned in the spec; layered context docs grown under `_docs/` as their subjects appear; no `CLAUDE.md` pointer (harness adaptation — `AGENTS.md` is native here); `product-spec.md` at repo root per rubric.
 
@@ -49,26 +50,24 @@
   3. Template residue — moot for in-harness generation; the acceptance criterion is "clean scaffold."
 - **Out of scope for the first submission:** mobile/touch input, new gameplay features, performance work. Candidates for the second attempt.
 
-## 4. Rubric mapping (criterion → plan coverage → tier)
+## 4. Rubric mapping (FINAL rubric, verified 2026-10-17 — 12 criteria, 24 points, pass 10)
 
 | # | Criterion (max) | Covered by | Tier |
 |---|---|---|---|
 | 1 | Problem description (2) | README + `product-spec.md` | MUST |
-| 2 | AI-assisted workflow documentation (2) | `docs/ai-usage` + diary + context docs + review records | MUST |
-| 3 | Technologies & architecture (2) | Architecture docs, this plan §5 | MUST |
-| 4 | Frontend (3) | M2 (core + shell + centralized services + tests + run instructions) | MUST |
-| 5 | API contract (2) | M3 (OpenAPI derived from services layer, backend built against it) | MUST |
-| 6 | Backend (3) | M3 (FastAPI + tests) | MUST |
-| 7 | Database integration (2) | M3/M4 (SQLite local + Neon cloud, documented) | MUST |
-| 8 | Containerization (2) | M1 (Dockerfile) + `docker-compose.yml` runnable end to end | MUST |
-| 9 | Integration testing (2) | M4 (integration separated from unit; key workflows) | MUST |
-| 10 | Deployment (2) | M4 (public URL, health-validated) | MUST |
-| 11 | CI/CD (2) | M1 CI + M4 deploy-on-green CD | MUST |
-| 12 | Agent extension pack (2) | Used throughout; formalized M6 (`agent-capabilities/`, `agent-hooks/`, `mcp-server/`, `docs/agent-extension-pack.md`, `docs/permissions.md`) | MUST |
-| 13 | Security/audit/DevOps (2) | M5 (scan findings from CI, audit output, agent security notes, operational diagnosis output, AI tool/data policy) | MUST |
-| 14 | Reproducibility (2) | M6 docs (setup/run/test/deploy end to end) | MUST |
+| 2 | Product specification (2) | `product-spec.md` + GitHub Issues (AC per task, agent-usage evidence per [`docs/agent-work-evidence.md`](../docs/agent-work-evidence.md)); tracker becomes publicly accessible at submission (D11) | MUST |
+| 3 | Agent team specification (2) | `.agents/agents/*.md` role files + graph lifecycle; `process.md` §8; `docs/agent-work-evidence.md` | MUST |
+| 4 | Context management (2) | `AGENTS.md` → modular `_docs/*` (process, plan, backlog, tuning) | MUST |
+| 5 | Application (2) | Full-stack end-to-end (M2–M4); runs locally with a single command (`npm run dev`, `docker compose up`) | MUST |
+| 6 | Testing (2) | Unit + integration suites, single command, green (M2–M4; E2E extra) | MUST |
+| 7 | Containerization (2) | #3 done — Compose runs the full system incl. DB, single command | MUST ✅ |
+| 8 | Deployment (2) | #5 — public URL, health-validated | MUST |
+| 9 | CI/CD (3) | CI on PRs (#2) + CD to dev + manual prod promotion (D6 architecture = the 3-point level) | MUST |
+| 10 | Observability (2) | M5: key user journey with metrics + traces + structured logs sharing a trace ID; **no customer data or credentials in any signal**; collected and viewable (Grafana Cloud) | MUST |
+| 11 | Alerting on user impact (1) | M5: ≥1 actionable alert on a user-impact symptom | MUST |
+| 12 | On-call agent (2) | M5: on-call agent wakes on alert and fixes (D8 tier 1, dev only) | MUST |
 
-Not rubric-mandated (experiment/polisH): OTel depth beyond diagnosis needs, two-session E2E, trivy, contract-drift automation, local observability stack, design-system doc depth.
+Security layer (scanners, audits, tool/data policy) is retained at planned scale as good engineering and feeds "no credentials in telemetry" — **explicitly non-graded** in the final rubric. Quality of frontend/backend/API/DB still feeds criterion 5 and the overall submission, but is no longer separately graded.
 
 ## 5. Architecture (target, reached incrementally)
 
@@ -87,24 +86,24 @@ MoSCoW: **MUST** = rubric-critical; **SHOULD** = high value with defined fallbac
 | ID | Dates | Milestone | Tiering |
 |---|---|---|---|
 | M0 | Oct 15–16 | **Planning artifacts.** Agree + commit this plan; diary entry. Re-check rubric. Agent extracts product spec from pinned 2025 SHA → `product-spec.md` (human-approved; constants pinned; testability hooks; `bonusJumps` decision). Scaffold context docs and rubric-aligned dirs. Create + groom M1/M2 issues with dependencies. | MUST. Spec approval gates all implementation; one focused review pass, not perfectionism — the spec is living, later changes go through issues. |
-| M1 | Oct 16–17 | **Walking skeleton + early pipeline.** Monorepo scaffold; CI on first PR (lint, unit tests, Docker build, `pip-audit`/`npm audit` report, gitleaks gate); Dockerfile; `/health`; `docker-compose.yml`; dev deploy to Render + Neon; FastAPI OTel auto-instrumentation code (export config dormant until M5). | MUST. NOT in M1 (moved): Grafana Cloud onboarding, dashboards, health-monitor workflow, trivy. |
+| M1 | Oct 16–17 | **Walking skeleton + early pipeline.** Monorepo scaffold; CI on first PR (lint, unit tests, Docker build, `pip-audit`/`npm audit` report, gitleaks gate); Dockerfile; `/health`; `docker-compose.yml`; dev deploy to Render + Neon; **minimal OTel instrumentation + export in #4** (active, not dormant — final-rubric alignment 2026-10-17: trace-ID correlation capability + no-customer-data constraint now; dashboards/alerts stay M5). | MUST. NOT in M1: Grafana Cloud onboarding, dashboards, health-monitor workflow, trivy. |
 | M2 | Oct 18–20 | **Game core + frontend-first.** ~6 session-sized graph issues: (1) physics/collision, (2) scoring + lives/levels, (3) level/difficulty progression + `bonusJumps` delta, (4) canvas shell + HUD + screens, (5) services layer + mocks + localStorage fallback, (6) audio. TDD on 1–3; test-after on 4–6. | MUST. Issue batching is deliberate: review load sized to 4–6 h/day. |
 | **C1** | **Oct 21 EOD** | **Checkpoint 1** (criteria and cut list below). | Gate. |
 | M3 | Oct 21–22 | **Contract + backend.** `openapi.yaml` from services layer; FastAPI + SQLAlchemy + Neon; API test suite; switch services to real backend. | MUST. Contract-drift CI automation COULD. |
 | M4 | Oct 22–23 | **Integration, E2E, CD.** Integration tests (Compose, separated from unit); Playwright happy-path E2E (load → play → game over → submit → leaderboard); GHCR immutable tags; deploy-on-green CD to dev; prod service + first manual promotion; scheduled health-monitor workflow. | MUST. Two-session (two-browser) E2E COULD. |
 | **C2** | **Oct 23 EOD** | **Checkpoint 2:** CD green on dev with a promotion to prod demonstrated? If not: fall back to documented manual promotion + deploy-on-green demonstrated on dev only (known ~1-point risk on #11) and keep building. | Gate. |
-| M5 | Oct 23–24 | **Ops + security evidence.** Grafana Cloud onboarding (dev + prod); one app dashboard (games played, scores submitted, leaderboard reads, validation rejections) labeled env + version; 1–2 actionable alerts; on-call exercise (D8 tier 1, fallback tier 2). Security: audit report #1 (read-only subagent + external model if available), AI tool/data policy, agent security notes. | Diagnosis output + audit + policy MUST. Dashboard depth, >2 alerts, tier-1 drill SHOULD/COULD per C1 state. |
-| M6 | Oct 24–25 | **Extension pack + docs + demo.** Formalize pack artifacts incl. `docs/agent-extension-pack.md`, `docs/permissions.md`; README + docs (problem, architecture, setup/run/test/deploy, AI usage); screenshots + short video + live link. | MUST. Demo artifacts explicitly not optional — 2025 shipped none and lost its evidence. |
-| M7 | Oct 25–26 | **Buffer + submission.** Rubric self-assessment (§4 table); fix gaps; final promotion; submit. Scope freeze after Oct 25 EOD. | MUST. Buffer absorbs M2–M4 slippage. |
+| M5 | Oct 23–24 | **Ops completion (all MUST after the final-rubric alignment):** Grafana Cloud onboarding (dev + prod); the key user journey instrumented with correlated metrics/traces/logs (builds on #4's early instrumentation); env/version dashboards covering the journey; ≥1 actionable alert; **on-call drill tier 1 in dev** (agent wakes on alert, smallest fix as a PR). Security at planned scale (audit report #1, AI tool/data policy, agent security notes) — good practice, non-graded. Rollback drill (redeploy previous tag) SHOULD — supports the CI/CD rollback path. | ALL ops items MUST (5 graded points). Dashboard depth beyond the journey, >1 alert, extra hardening: COULD. |
+| M6 | Oct 24–25 | **Team/context evidence + docs + demo.** `process.md` §8 applied; `docs/agent-work-evidence.md` kept current; permissions/role notes consolidated; README + docs (problem, architecture, setup/run/test/deploy, AI usage); screenshots + short video + live link. (The final rubric dropped the expected-directories list — the pack artifacts stay because they evidence Agent Team + Context Management, 4 graded points.) | MUST. Demo artifacts explicitly not optional — 2025 shipped none and lost its evidence. |
+| M7 | Oct 25–26 | **Buffer + submission.** Rubric self-assessment against the final 12 criteria; fix gaps; final promotion; **D11: flip repo public + pin SHA**; submit. Scope freeze after Oct 25 EOD. | MUST. Buffer absorbs M2–M4 slippage. |
 
 **C1 criteria (all must hold):** game playable on local or dev deploy with core-logic tests green; spec deltas closed; CI green on `main` for the last ≥3 PRs; your review load averaging ≤6 h/day; no issue needing >1.5 sessions.
 
-**C1 ordered cut list (execute as needed, each recorded as a dated decision in the diary):**
-1. Two-session E2E → WONT(v1) (happy path satisfies #9).
-2. On-call drill → tier 2 (ops-triggered incident; no agent-injected bug).
-3. trivy, contract-drift automation, local observability stack → WONT(v1).
-4. Dashboards → Grafana Cloud defaults + one app dashboard; alerts → one actionable alert.
-5. Graph fallback (last resort, preserves D3's spirit under deadline): docs/chore issues run single-session; logic/backend issues keep the full graph.
+**C1 ordered cut list (revised 2026-10-17 for the final rubric — ops items are graded and no longer cuttable; execute as needed, each cut as a dated diary decision):**
+1. Two-session E2E → WONT(v1) (happy path satisfies the Testing criterion).
+2. trivy, contract-drift automation, local observability stack → WONT(v1).
+3. Dashboard/alert depth beyond the key journey and the required alert → WONT(v1).
+4. Rollback drill → paper walkthrough instead of live redeploy (CI/CD rollback path stays documented).
+5. Graph fallback (last resort, preserves D3's spirit under deadline): docs/chore issues run single-session; logic/backend/ops issues keep the full graph.
 
 **C1 STOP-and-rescope branch:** if the core loop is not playable by Oct 21 EOD — freeze physics fidelity to "playable parity" (core loop complete; fine physics nuance to the second attempt) and protect M3–M7 unchanged, because backend, CD, pack, and docs are irreplaceable for the rubric while physics nuance is recoverable.
 

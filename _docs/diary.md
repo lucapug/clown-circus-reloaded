@@ -248,6 +248,25 @@ Fetched the final page from the source repo and diffed it against the draft capt
 5. Prioritize approving `process.md` §8 (Agent Team evidence) and keep the planned `docs/permissions.md`-style notes as Agent Team documentation.
 6. Add to D7/issue #4 acceptance criteria: trace-ID correlation across a user journey + zero customer data in telemetry.
 
+### Owner decisions (2026-10-17, taken one at a time) and application
+
+1. **D11 — tracker/visibility:** repo stays **private during development**, goes **public immediately before submission with the SHA pinned** (owner's standard capstone practice; M7 task). The tracker evidence = closed issues with AC + agent-work comment sequences.
+2. **Tracker attribution problem (owner-raised):** all GitHub content is posted through the single owner account, so roles are invisible at author level. Analysis of the closed issues showed the roles ARE structurally distinguishable (formats matching versioned role files committed beforehand; causal chains PM-brief → QA → REQUEST_CHANGES → fix SHAs → APPROVE → re-check; role-consistent absences). **Applied package:** mandatory visible attribution header on every agent comment (`[ROLE · role file@sha · posted-by lucapug, content authored by the role agent]`), `Assisted-by: ZCode-<role>` Git trailers on future commits, and `docs/agent-work-evidence.md` indexing the pre-convention artifacts — issues untouched. Committed in `a314f8f`.
+3. **M5 re-tiering:** MUST (option 3 variant) — the *minimal instrumentation + export* is pulled into issue #4 (today), while dashboards, alerts, and the drill stay in the M5 window (owner's explicit scoping).
+4. **C1 cut list revised:** ops items removed from the cut (graded points); remaining cuts: two-session E2E → trivy/drift/local-stack → dashboard depth → rollback-drill-to-paper → graph fallback as last resort.
+5. **plan.md rev 2:** §4 rewritten to the final rubric; D11 added; M1/M5/M6/M7 rows updated; status line records the final-rubric alignment.
+6. **`process.md` §8 applied** with the two approved integrations (attribution header convention; observability tiering + no-customer-data rule) plus the dependency policy.
+
+### Lessons
+
+- The final rubric inverted the draft's emphasis: the two categories the discovery report flagged as *new graded areas* (extension pack, security) are gone as criteria, while operations went from "not a line item" to 5/24 points. Lesson reinforced: re-read primary sources at every transition; the plan's scheduled re-check caught this within one day of the change.
+- Single-account attribution is a real evidentiary constraint of agent-driven development; solving it with structural evidence (formats ↔ versioned files ↔ causal chains) rather than synthetic identities keeps the evidence honest and the constraint disclosed.
+
+### Next
+
+Backlog resumes: cycle **#2 (CI)** — reviewer via `Explore` (GLM-5.2) in parallel with QA; attribution headers active from this cycle's first comment; #4 follows with the upgraded acceptance criteria.
+
+
 
 
 
