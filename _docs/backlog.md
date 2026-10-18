@@ -11,7 +11,7 @@ graph TD
     I2["#2 CI on PRs ✅ merged"]
         I3["#3 Dockerfile + Compose ✅ merged"]
     I4["#4 OTel instrumentation (active) ✅ merged"]
-    I5["#5 Dev deploy Render + Neon"]
+    I5["#5 Dev deploy Render + Neon ✅ merged"]
     end
 
     subgraph M2["M2 — Game core + frontend-first (Oct 18–20)"]
