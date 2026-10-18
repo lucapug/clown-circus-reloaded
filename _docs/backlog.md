@@ -15,7 +15,7 @@ graph TD
     end
 
     subgraph M2["M2 — Game core + frontend-first (Oct 18–20)"]
-        I6["#6 Deterministic core: ticks, RNG, physics"]
+        I6["#6 Deterministic core: ticks, RNG, physics ✅ merged"]
         I7["#7 Scoring module + lives/levels"]
         I8["#8 Progression + bonusJumps (2026 dec. A)"]
         I9["#9 Canvas shell, HUD, screens"]
