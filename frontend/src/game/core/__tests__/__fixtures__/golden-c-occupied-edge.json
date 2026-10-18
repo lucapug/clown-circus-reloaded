@@ -47,7 +47,14 @@
         "score": 0,
         "lives": 1,
         "bonusJumps": 0
-      }
+      },
+      "events": [
+        {
+          "type": "death",
+          "clownIndex": 1,
+          "cause": "occupied-edge"
+        }
+      ]
     },
     "30": {
       "phase": "playing",
@@ -88,7 +95,8 @@
         "score": 0,
         "lives": 1,
         "bonusJumps": 0
-      }
+      },
+      "events": []
     },
     "60": {
       "phase": "playing",
@@ -129,7 +137,8 @@
         "score": 0,
         "lives": 1,
         "bonusJumps": 0
-      }
+      },
+      "events": []
     },
     "120": {
       "phase": "playing",
@@ -170,7 +179,8 @@
         "score": 0,
         "lives": 1,
         "bonusJumps": 0
-      }
+      },
+      "events": []
     },
     "300": {
       "phase": "playing",
@@ -211,7 +221,8 @@
         "score": 0,
         "lives": 1,
         "bonusJumps": 0
-      }
+      },
+      "events": []
     }
   },
   "seed": 3,

@@ -47,7 +47,21 @@
         "score": 0,
         "lives": 3,
         "bonusJumps": 0
-      }
+      },
+      "events": [
+        {
+          "type": "landed-edge",
+          "clownIndex": 1,
+          "side": "right"
+        },
+        {
+          "type": "launched",
+          "clownIndex": 0,
+          "via": "chain",
+          "vx": -1.9531809873878956,
+          "vy": -14.2
+        }
+      ]
     },
     "30": {
       "phase": "playing",
@@ -88,7 +102,8 @@
         "score": 0,
         "lives": 3,
         "bonusJumps": 0
-      }
+      },
+      "events": []
     },
     "60": {
       "phase": "playing",
@@ -129,7 +144,8 @@
         "score": 0,
         "lives": 3,
         "bonusJumps": 0
-      }
+      },
+      "events": []
     },
     "120": {
       "phase": "playing",
@@ -170,7 +186,8 @@
         "score": 0,
         "lives": 3,
         "bonusJumps": 0
-      }
+      },
+      "events": []
     },
     "300": {
       "phase": "playing",
@@ -211,7 +228,8 @@
         "score": 0,
         "lives": 3,
         "bonusJumps": 0
-      }
+      },
+      "events": []
     }
   },
   "seed": 7

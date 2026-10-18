@@ -46,6 +46,8 @@ export interface ScenarioRun {
   finalState: GameState;
   events: GameEvent[];
   snapshots: Record<number, GameState>;
+  /** Events emitted in each snapshot tick, in emission order (design decision 1). */
+  eventSnapshots: Record<number, GameEvent[]>;
 }
 
 export const runScenario = (
@@ -58,13 +60,17 @@ export const runScenario = (
   const rng = createRng(seed);
   const events: GameEvent[] = [];
   const snapshots: Record<number, GameState> = {};
+  const eventSnapshots: Record<number, GameEvent[]> = {};
   for (let tick = 1; tick <= SCENARIO_TICKS; tick++) {
     const result = step(state, inputsAt(state, tick), rng, consequences);
     state = result.state;
     events.push(...result.events);
-    if ((SNAPSHOT_TICKS as readonly number[]).includes(tick)) snapshots[tick] = state;
+    if ((SNAPSHOT_TICKS as readonly number[]).includes(tick)) {
+      snapshots[tick] = state;
+      eventSnapshots[tick] = result.events;
+    }
   }
-  return { finalState: state, events, snapshots };
+  return { finalState: state, events, snapshots, eventSnapshots };
 };
 
 // (a) Seed 42: diving-board clown launched at tick 10, seated clown at tick 20

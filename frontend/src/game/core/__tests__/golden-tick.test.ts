@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isDeathEvent } from '../events';
+import { isDeathEvent, type GameEvent } from '../events';
 import type { GameState } from '../types';
 import {
   SNAPSHOT_TICKS,
@@ -14,7 +14,10 @@ import {
 
 // Issue #6 AC 1: committed golden fixtures reproduce scripted, seeded runs
 // exactly (full-state JSON.stringify equality — no rounding; IEEE-754
-// arithmetic is deterministic). Fixtures live in __fixtures__/golden-*.json.
+// arithmetic is deterministic). Per design decision 1, each recorded tick
+// snapshot also includes the events emitted in that tick, in emission order,
+// so event ordering across long runs is pinned too. Fixtures live in
+// __fixtures__/golden-*.json.
 const fixtures = import.meta.glob<Record<string, unknown>>('./__fixtures__/golden-*.json', {
   import: 'default',
   eager: true,
@@ -23,7 +26,7 @@ const fixtures = import.meta.glob<Record<string, unknown>>('./__fixtures__/golde
 interface GoldenFixture {
   scenario: string;
   snapshotTicks: number[];
-  snapshots: Record<string, GameState>;
+  snapshots: Record<string, GameState & { events: GameEvent[] }>;
 }
 
 const fixtureFor = (name: string): GoldenFixture => {
@@ -35,7 +38,8 @@ const fixtureFor = (name: string): GoldenFixture => {
 const expectGoldenMatch = (name: string, run: ScenarioRun): void => {
   const fixture = fixtureFor(name);
   for (const tick of SNAPSHOT_TICKS) {
-    const actual = JSON.stringify(run.snapshots[tick]);
+    // State AND per-tick events, byte equality, as one snapshot.
+    const actual = JSON.stringify({ ...run.snapshots[tick], events: run.eventSnapshots[tick] });
     const expected = JSON.stringify(fixture.snapshots[String(tick)]);
     expect(actual, `${name} diverged from the golden fixture at tick ${tick}`).toBe(expected);
   }
