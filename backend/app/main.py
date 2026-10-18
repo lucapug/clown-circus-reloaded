@@ -15,6 +15,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from opentelemetry.sdk._logs import LoggingHandler
 
 from app.config import database_from_env
 
@@ -28,7 +29,12 @@ DIST_DIR = BASE_DIR / "frontend" / "dist"
 async def lifespan(_: FastAPI):
     _, backend = database_from_env()
     logger.info("database backend: %s", backend)
-    yield
+    handler = LoggingHandler(level=logging.INFO)
+    logger.addHandler(handler)
+    try:
+        yield
+    finally:
+        logger.removeHandler(handler)
 
 
 def create_app() -> FastAPI:
@@ -36,6 +42,7 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     def health() -> dict[str, str]:
+        logger.info("health check ok")
         return {"status": "ok"}
 
     if DIST_DIR.is_dir():
