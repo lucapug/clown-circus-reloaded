@@ -368,3 +368,28 @@ PM 167,803 · engineer 330,092 · QA 294,777 + 262,121 (amendment) · reviewer 1
 ### Next
 
 Owner merges PR #16 (#5 closes; label removed; **M1 complete**). Then M2 opens with #6 (deterministic game core, TDD; first real test commit also removes `--passWithNoTests`). The critical path (#1→#6→#7→#8→#9→#10) is fully unblocked and C1 (Oct 21) looks comfortably ahead.
+
+## 2026-10-18 — Cycle #7 (issue #6, PR #17): the deterministic game core, TDD flagship
+
+### What and why
+
+The critical-path start of M2 and the project's hardest correctness artifact: the fixed-tick deterministic game core (1 tick = 1/60 s accumulator-decoupled from rendering, mulberry32 seeded RNG hand-rolled, input queue drained at tick boundaries, semi-implicit Euler physics in the pinned 8-step order, typed event surface with a `ConsequenceReducer` seam for #7/#8, kernel never writes stats). The owner's same-morning reminder — the 2025 baseline is always available as the physics reference — was applied directly: the PM brief cites `useGameEngine.ts@0d365e6` line-by-line (10 "baseline behaviors adopted"), the baseline clone was refreshed at the pinned SHA, and two baseline-fidelity decisions were adopted with owner-defensible defaults (fall-off respawn → right board; initial seat ±width/3 quirk).
+
+### Outcome and independent verdicts
+
+[PR #17](https://github.com/lucapug/clown-circus-reloaded/pull/17) — 5 commits in the brief's TDD slices (commit 1 intentionally RED + `--passWithNoTests` removed), 14 core/test files + 5 golden fixtures. CI 6/6. [QA VERDICT: PASS](https://github.com/lucapug/clown-circus-reloaded/pull/17#issuecomment-6252192733) — the strongest verification of the project: QA **re-implemented the spec independently in a /tmp clone and replayed scenario (a)** — ticks 1 and 30 byte-identical to the committed fixture including the seeded vx; negative-tested the purity boundary (planted react/window file → tests fail); verified the TDD claim live (checked out the red commit → suite red). [REVIEW: REQUEST_CHANGES](https://github.com/lucapug/clown-circus-reloaded/pull/17#issuecomment-6252142403) — 1 [minor]: golden fixtures snapshotted state only, not events (brief decision 1), leaving event-emission order unpinned; → **mini-agent rework #2** (`57874cb`: fixtures regenerated with per-tick event arrays, state bytes proven unchanged pre/post, tests byte-compare both) → [REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/17#issuecomment-6252262931). Merge pending the owner.
+
+### Measured ledger (the most expensive cycle — on the hardest artifact)
+
+PM 331,375 (first attempt cancelled by interruption, unmeasured) · engineer 5,309,632 (largest single pass ever) · QA 1,701,363 (independent spec re-implementation) · reviewer 557,867 (Explore/GLM-5.2) · mini-agent 525,807 · reviewer close-out 377,165 → **≈ 8.60M**, ~205 tool uses, ≈ 62 min agent wall time. Stalls 0, escalations 0, 1 rework loop (mini-agent, within P1.4 limits — second successful trial). Baseline: #1 was 6.67M on a scaffold; #6 is 8.60M on the parity-critical core with an order-of-magnitude stronger verification. Confounders as always.
+
+### Lessons
+
+- The owner's baseline reminder was load-bearing: line-cited baseline behaviors turned "reproduce the 2025 physics" from a vibes-problem into an arithmetic one — the same lesson as the spec constants, applied at implementation depth.
+- QA's independent re-implementation is the gold standard for parity-critical code: expensive (1.7M), but it converts "tests pass" into "the spec, replayed from scratch, produces these bytes". Reserve it for the core; don't let it become the default battery.
+- Mini-agent trial #2: this rework was bigger than trial #1 (5 fixtures + test logic vs 1 file delete) and still landed surgical, byte-safe, and disclosed — two positive trials; the consolidation proposal for `process.md` gains evidence.
+- Event fixtures matter downstream: the reviewer's catch protects #7/#8, whose reducers consume exactly that order.
+
+### Next
+
+Owner merges PR #17 (#6 closes; label removed). Then #7 (scoring/lives consequences on the event seam), #8 (progression + bonusJumps Option A), #9 (shell/screens + E2E hooks), #10/#11 parallelizable. C1 (Oct 21 EOD): game playable locally, core tests green — today's result makes that checkpoint look comfortably reachable.
