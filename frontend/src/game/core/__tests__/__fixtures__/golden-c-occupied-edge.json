@@ -1,0 +1,219 @@
+{
+  "scenario": "c-occupied-edge",
+  "snapshotTicks": [
+    1,
+    30,
+    60,
+    120,
+    300
+  ],
+  "snapshots": {
+    "1": {
+      "phase": "playing",
+      "clowns": [
+        {
+          "x": 370,
+          "y": 496,
+          "vx": 0,
+          "vy": 0,
+          "isFlying": false,
+          "isOnSeesaw": true,
+          "seesawSide": "left",
+          "isOnDivingBoard": false,
+          "divingBoardIndex": null
+        },
+        {
+          "x": 60,
+          "y": 222,
+          "vx": 0,
+          "vy": 0,
+          "isFlying": false,
+          "isOnSeesaw": false,
+          "seesawSide": "left",
+          "isOnDivingBoard": true,
+          "divingBoardIndex": 0
+        }
+      ],
+      "balloons": [],
+      "seesaw": {
+        "x": 400,
+        "y": 520,
+        "width": 120,
+        "tilt": "left"
+      },
+      "currentJumpVelocity": -14,
+      "level": 1,
+      "stats": {
+        "score": 0,
+        "lives": 1,
+        "bonusJumps": 0
+      }
+    },
+    "30": {
+      "phase": "playing",
+      "clowns": [
+        {
+          "x": 370,
+          "y": 496,
+          "vx": 0,
+          "vy": 0,
+          "isFlying": false,
+          "isOnSeesaw": true,
+          "seesawSide": "left",
+          "isOnDivingBoard": false,
+          "divingBoardIndex": null
+        },
+        {
+          "x": 60,
+          "y": 222,
+          "vx": 0,
+          "vy": 0,
+          "isFlying": false,
+          "isOnSeesaw": false,
+          "seesawSide": "left",
+          "isOnDivingBoard": true,
+          "divingBoardIndex": 0
+        }
+      ],
+      "balloons": [],
+      "seesaw": {
+        "x": 400,
+        "y": 520,
+        "width": 120,
+        "tilt": "left"
+      },
+      "currentJumpVelocity": -14,
+      "level": 1,
+      "stats": {
+        "score": 0,
+        "lives": 1,
+        "bonusJumps": 0
+      }
+    },
+    "60": {
+      "phase": "playing",
+      "clowns": [
+        {
+          "x": 370,
+          "y": 496,
+          "vx": 0,
+          "vy": 0,
+          "isFlying": false,
+          "isOnSeesaw": true,
+          "seesawSide": "left",
+          "isOnDivingBoard": false,
+          "divingBoardIndex": null
+        },
+        {
+          "x": 60,
+          "y": 222,
+          "vx": 0,
+          "vy": 0,
+          "isFlying": false,
+          "isOnSeesaw": false,
+          "seesawSide": "left",
+          "isOnDivingBoard": true,
+          "divingBoardIndex": 0
+        }
+      ],
+      "balloons": [],
+      "seesaw": {
+        "x": 400,
+        "y": 520,
+        "width": 120,
+        "tilt": "left"
+      },
+      "currentJumpVelocity": -14,
+      "level": 1,
+      "stats": {
+        "score": 0,
+        "lives": 1,
+        "bonusJumps": 0
+      }
+    },
+    "120": {
+      "phase": "playing",
+      "clowns": [
+        {
+          "x": 370,
+          "y": 496,
+          "vx": 0,
+          "vy": 0,
+          "isFlying": false,
+          "isOnSeesaw": true,
+          "seesawSide": "left",
+          "isOnDivingBoard": false,
+          "divingBoardIndex": null
+        },
+        {
+          "x": 60,
+          "y": 222,
+          "vx": 0,
+          "vy": 0,
+          "isFlying": false,
+          "isOnSeesaw": false,
+          "seesawSide": "left",
+          "isOnDivingBoard": true,
+          "divingBoardIndex": 0
+        }
+      ],
+      "balloons": [],
+      "seesaw": {
+        "x": 400,
+        "y": 520,
+        "width": 120,
+        "tilt": "left"
+      },
+      "currentJumpVelocity": -14,
+      "level": 1,
+      "stats": {
+        "score": 0,
+        "lives": 1,
+        "bonusJumps": 0
+      }
+    },
+    "300": {
+      "phase": "playing",
+      "clowns": [
+        {
+          "x": 370,
+          "y": 496,
+          "vx": 0,
+          "vy": 0,
+          "isFlying": false,
+          "isOnSeesaw": true,
+          "seesawSide": "left",
+          "isOnDivingBoard": false,
+          "divingBoardIndex": null
+        },
+        {
+          "x": 60,
+          "y": 222,
+          "vx": 0,
+          "vy": 0,
+          "isFlying": false,
+          "isOnSeesaw": false,
+          "seesawSide": "left",
+          "isOnDivingBoard": true,
+          "divingBoardIndex": 0
+        }
+      ],
+      "balloons": [],
+      "seesaw": {
+        "x": 400,
+        "y": 520,
+        "width": 120,
+        "tilt": "left"
+      },
+      "currentJumpVelocity": -14,
+      "level": 1,
+      "stats": {
+        "score": 0,
+        "lives": 1,
+        "bonusJumps": 0
+      }
+    }
+  },
+  "seed": 3,
+  "deathCause": "occupied-edge"
+}

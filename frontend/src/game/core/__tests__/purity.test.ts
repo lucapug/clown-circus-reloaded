@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 // Spec §6.1: the core is framework-free — no React/canvas code, no DOM/browser
 // globals. Decided implementation: an import-boundary test over the raw source
-// of every core module (no lint plugin in the scaffold).
+// of every core module (no lint plugin in the scaffold). The single-level
+// pattern scans exactly the top-level core modules, never __tests__.
 const coreSources: Record<string, string> = Object.fromEntries(
   Object.entries(
-    import.meta.glob<string>('../**/*.ts', { query: '?raw', import: 'default', eager: true }),
+    import.meta.glob<string>('../[a-z-]*.ts', { query: '?raw', import: 'default', eager: true }),
   ).filter(([path]) => !path.includes('__tests__') && !/\.test\.ts$/.test(path)),
 );
 
