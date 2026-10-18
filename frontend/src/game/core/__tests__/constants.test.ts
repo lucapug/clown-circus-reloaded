@@ -29,6 +29,7 @@ import {
   LANDING_Y,
   LEVEL_MULT_STEP,
   MAX_JUMP_VELOCITY,
+  RESPAWN_BOARD_HEIGHT_INDEX,
   SEAT_OFFSET,
   SEESAW_CLAMP_MAX,
   SEESAW_CLAMP_MIN,
@@ -115,6 +116,13 @@ describe('core constants (spec §3.1/§3.4 pinned values)', () => {
     expect(LEVEL_MULT_STEP).toBe(0.25);
     expect(levelMultiplier(1)).toBe(1);
     expect(levelMultiplier(3)).toBe(1.5);
+  });
+
+  it('pins the interim entry-trampoline height default (owner decision still open on the height)', () => {
+    // Only the HEIGHT default is pinned here (0 = high board, y=250). The
+    // entry SIDE is the free end of the seesaw and is asserted by the
+    // tick-order death tests, never by height.
+    expect(RESPAWN_BOARD_HEIGHT_INDEX).toBe(0);
   });
 
   it('decouples the accumulator: dt = 1/30 runs exactly 2 ticks', () => {

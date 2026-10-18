@@ -28,6 +28,18 @@ const seatedLeft = (x: number): Clown => ({
   divingBoardIndex: null,
 });
 
+const seatedRight = (x: number): Clown => ({
+  x,
+  y: LANDING_Y,
+  vx: 0,
+  vy: 0,
+  isFlying: false,
+  isOnSeesaw: true,
+  seesawSide: 'right',
+  isOnDivingBoard: false,
+  divingBoardIndex: null,
+});
+
 const flying = (x: number, y: number, vx: number, vy: number, seesawSide: 'left' | 'right' = 'right'): Clown => ({
   x,
   y,
@@ -130,9 +142,12 @@ export const deathScenarios = (): DeathScenario[] => [
   {
     name: 'c-fall-off',
     cause: 'fall-off',
+    // Seated clown on the RIGHT: under the owner free-side rule (issue #6
+    // comment 6252402875) the entering clown takes the LEFT board — this is
+    // what distinguishes the rule from the 2025 always-right hardcode.
     start: playing({
       balloons: [],
-      clowns: [flying(200, 650, 0, 0), seatedLeft(370)],
+      clowns: [flying(200, 650, 0, 0), seatedRight(430)],
       stats: { score: 0, lives: 1, bonusJumps: 0 },
     }),
   },

@@ -12,24 +12,24 @@
       "phase": "playing",
       "clowns": [
         {
-          "x": 740,
+          "x": 60,
           "y": 222,
           "vx": 0,
           "vy": 0,
           "isFlying": false,
           "isOnSeesaw": false,
-          "seesawSide": "right",
+          "seesawSide": "left",
           "isOnDivingBoard": true,
-          "divingBoardIndex": 2
+          "divingBoardIndex": 0
         },
         {
-          "x": 370,
+          "x": 430,
           "y": 496,
           "vx": 0,
           "vy": 0,
           "isFlying": false,
           "isOnSeesaw": true,
-          "seesawSide": "left",
+          "seesawSide": "right",
           "isOnDivingBoard": false,
           "divingBoardIndex": null
         }
@@ -39,7 +39,7 @@
         "x": 400,
         "y": 520,
         "width": 120,
-        "tilt": "left"
+        "tilt": "right"
       },
       "currentJumpVelocity": -14,
       "level": 1,
@@ -60,24 +60,24 @@
       "phase": "playing",
       "clowns": [
         {
-          "x": 740,
+          "x": 60,
           "y": 222,
           "vx": 0,
           "vy": 0,
           "isFlying": false,
           "isOnSeesaw": false,
-          "seesawSide": "right",
+          "seesawSide": "left",
           "isOnDivingBoard": true,
-          "divingBoardIndex": 2
+          "divingBoardIndex": 0
         },
         {
-          "x": 370,
+          "x": 430,
           "y": 496,
           "vx": 0,
           "vy": 0,
           "isFlying": false,
           "isOnSeesaw": true,
-          "seesawSide": "left",
+          "seesawSide": "right",
           "isOnDivingBoard": false,
           "divingBoardIndex": null
         }
@@ -87,7 +87,7 @@
         "x": 400,
         "y": 520,
         "width": 120,
-        "tilt": "left"
+        "tilt": "right"
       },
       "currentJumpVelocity": -14,
       "level": 1,
@@ -102,24 +102,24 @@
       "phase": "playing",
       "clowns": [
         {
-          "x": 740,
+          "x": 60,
           "y": 222,
           "vx": 0,
           "vy": 0,
           "isFlying": false,
           "isOnSeesaw": false,
-          "seesawSide": "right",
+          "seesawSide": "left",
           "isOnDivingBoard": true,
-          "divingBoardIndex": 2
+          "divingBoardIndex": 0
         },
         {
-          "x": 370,
+          "x": 430,
           "y": 496,
           "vx": 0,
           "vy": 0,
           "isFlying": false,
           "isOnSeesaw": true,
-          "seesawSide": "left",
+          "seesawSide": "right",
           "isOnDivingBoard": false,
           "divingBoardIndex": null
         }
@@ -129,7 +129,7 @@
         "x": 400,
         "y": 520,
         "width": 120,
-        "tilt": "left"
+        "tilt": "right"
       },
       "currentJumpVelocity": -14,
       "level": 1,
@@ -144,24 +144,24 @@
       "phase": "playing",
       "clowns": [
         {
-          "x": 740,
+          "x": 60,
           "y": 222,
           "vx": 0,
           "vy": 0,
           "isFlying": false,
           "isOnSeesaw": false,
-          "seesawSide": "right",
+          "seesawSide": "left",
           "isOnDivingBoard": true,
-          "divingBoardIndex": 2
+          "divingBoardIndex": 0
         },
         {
-          "x": 370,
+          "x": 430,
           "y": 496,
           "vx": 0,
           "vy": 0,
           "isFlying": false,
           "isOnSeesaw": true,
-          "seesawSide": "left",
+          "seesawSide": "right",
           "isOnDivingBoard": false,
           "divingBoardIndex": null
         }
@@ -171,7 +171,7 @@
         "x": 400,
         "y": 520,
         "width": 120,
-        "tilt": "left"
+        "tilt": "right"
       },
       "currentJumpVelocity": -14,
       "level": 1,
@@ -186,24 +186,24 @@
       "phase": "playing",
       "clowns": [
         {
-          "x": 740,
+          "x": 60,
           "y": 222,
           "vx": 0,
           "vy": 0,
           "isFlying": false,
           "isOnSeesaw": false,
-          "seesawSide": "right",
+          "seesawSide": "left",
           "isOnDivingBoard": true,
-          "divingBoardIndex": 2
+          "divingBoardIndex": 0
         },
         {
-          "x": 370,
+          "x": 430,
           "y": 496,
           "vx": 0,
           "vy": 0,
           "isFlying": false,
           "isOnSeesaw": true,
-          "seesawSide": "left",
+          "seesawSide": "right",
           "isOnDivingBoard": false,
           "divingBoardIndex": null
         }
@@ -213,7 +213,7 @@
         "x": 400,
         "y": 520,
         "width": 120,
-        "tilt": "left"
+        "tilt": "right"
       },
       "currentJumpVelocity": -14,
       "level": 1,

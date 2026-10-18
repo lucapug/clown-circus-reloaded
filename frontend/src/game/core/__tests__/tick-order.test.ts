@@ -270,7 +270,10 @@ describe('pinned tick order (spec §3)', () => {
     expect(state.clowns[1]).toMatchObject({ isOnDivingBoard: true, divingBoardIndex: 0, x: 60 });
   });
 
-  it('kills a flying clown past the fall-off line and respawns it on the right board (baseline behavior)', () => {
+  it('sends a fall-off death to the board on the FREE side (seated left → right entry)', () => {
+    // Owner rule (issue #6 comment 6252402875): entry side = free end of the
+    // seesaw, derived from gameplay state — the 2025 always-right hardcode is
+    // overridden. Assertions are side-based, never height-based.
     const { state, events } = step(
       playing({ balloons: [], clowns: [flying(200, 650, 0, 0), seatedLeft(370)] }),
       [],
@@ -278,7 +281,34 @@ describe('pinned tick order (spec §3)', () => {
     );
     const death = expectEvent(events, 'death');
     expect(death.cause).toBe('fall-off');
-    expect(state.clowns[0]).toMatchObject({ isOnDivingBoard: true, divingBoardIndex: 2, x: 740, y: 222 });
+    expect([2, 3]).toContain(state.clowns[0].divingBoardIndex); // right-side pair
+    expect(state.clowns[0].x).toBe(740);
+    expect(state.clowns[0].isOnDivingBoard).toBe(true);
+  });
+
+  it('sends a fall-off death to the LEFT side when the seated clown is on the right (free-side rule)', () => {
+    const { state, events } = step(
+      playing({ balloons: [], clowns: [flying(200, 650, 0, 0, 'right'), seatedRight(430)] }),
+      [],
+      createRng(1),
+    );
+    const death = expectEvent(events, 'death');
+    expect(death.cause).toBe('fall-off');
+    expect([0, 1]).toContain(state.clowns[0].divingBoardIndex); // left-side pair
+    expect(state.clowns[0].x).toBe(60);
+    expect(state.clowns[0].isOnDivingBoard).toBe(true);
+  });
+
+  it('falls back to the 2025 side (right) when no clown is seated at fall-off resolution', () => {
+    const { state, events } = step(
+      playing({ balloons: [], clowns: [flying(200, 650, 0, 0), flying(600, 500, 0, 5, 'right')] }),
+      [],
+      createRng(1),
+    );
+    const death = expectEvent(events, 'death');
+    expect(death.cause).toBe('fall-off');
+    expect([2, 3]).toContain(state.clowns[0].divingBoardIndex); // 2025 fallback side: right pair
+    expect(state.clowns[0].x).toBe(740);
   });
 
   it('no-ops unless the phase is playing', () => {

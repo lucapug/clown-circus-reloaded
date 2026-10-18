@@ -17,6 +17,7 @@ import {
   LANDING_Y,
   MAX_JUMP_VELOCITY,
   MAX_TICKS_PER_ADVANCE,
+  RESPAWN_BOARD_HEIGHT_INDEX,
   SEAT_OFFSET,
   SEESAW_CLAMP_MAX,
   SEESAW_CLAMP_MIN,
@@ -50,7 +51,15 @@ export interface StepResult {
   events: GameEvent[];
 }
 
-const freeBoardIndexFor = (side: 'left' | 'right'): 0 | 1 | 2 | 3 => (side === 'left' ? 2 : 0);
+const freeSideOf = (side: 'left' | 'right'): 'left' | 'right' => (side === 'left' ? 'right' : 'left');
+
+// Entering clowns take the free end of the seesaw (owner decision 2026-10-18,
+// issue #6 comment 6252402875): the side pair is derived from current gameplay
+// state, never fixed. The height within the pair is the still-open owner
+// decision (interim: high board). 'left' pair is boards 0/1, 'right' is 2/3.
+const respawnBoardIndex = (enteringSide: 'left' | 'right'): 0 | 1 | 2 | 3 =>
+  // base ∈ {0, 2} + height ∈ {0, 1} ⊆ {0, 1, 2, 3} — cast only narrows arithmetic.
+  ((enteringSide === 'left' ? 0 : 2) + RESPAWN_BOARD_HEIGHT_INDEX) as 0 | 1 | 2 | 3;
 
 /**
  * Advance the simulation by exactly one logic tick (1/60 s).
@@ -226,9 +235,10 @@ export function step(
             (c, idx) => idx !== i && c.isOnSeesaw && c.seesawSide === side,
           );
           if (otherClownOnSameSide) {
-            // Occupied edge → death (baseline :286–287).
+            // Occupied edge → death (baseline :286–287); the entering clown
+            // takes the free side — opposite the dying clown's seesaw side.
             currentJumpVelocity = INITIAL_JUMP_VELOCITY;
-            clowns[i] = createBoardClown(freeBoardIndexFor(clown.seesawSide));
+            clowns[i] = createBoardClown(respawnBoardIndex(freeSideOf(clown.seesawSide)));
             events.push({ type: 'death', clownIndex: i as 0 | 1, cause: 'occupied-edge' });
           } else {
             // Safe edge landing: snap to the seat, strengthen the jump velocity
@@ -247,19 +257,27 @@ export function step(
             if (otherIdx !== -1) chainLaunchIdx = otherIdx;
           }
         } else {
-          // Middle third → death (baseline :324–325).
+          // Middle third → death (baseline :324–325); the entering clown
+          // takes the free side — opposite the dying clown's seesaw side.
           currentJumpVelocity = INITIAL_JUMP_VELOCITY;
-          clowns[i] = createBoardClown(freeBoardIndexFor(clown.seesawSide));
+          clowns[i] = createBoardClown(respawnBoardIndex(freeSideOf(clown.seesawSide)));
           events.push({ type: 'death', clownIndex: i as 0 | 1, cause: 'middle' });
         }
         landedOrDied = true;
       }
     }
 
-    // Fall-off (baseline :331, :340 — respawns on the right board, owner-decided).
+    // Fall-off (baseline :331 threshold). Owner decision 2026-10-18 (issue #6
+    // comment 6252402875): the next clown enters on the FREE side — opposite
+    // the currently seated clown, derived from gameplay state (this overrides
+    // the 2025 always-right hardcode at baseline :340; spec §3.4 primacy).
+    // Edge case: no clown seated at resolution time → fall back to the 2025
+    // side (right), deterministic.
     if (!landedOrDied && clown.y > FALL_OFF_Y) {
+      const seatedClown = clowns.find((c) => c.isOnSeesaw);
+      const enteringSide: 'left' | 'right' = seatedClown ? freeSideOf(seatedClown.seesawSide) : 'right';
       currentJumpVelocity = INITIAL_JUMP_VELOCITY;
-      clowns[i] = createBoardClown(2);
+      clowns[i] = createBoardClown(respawnBoardIndex(enteringSide));
       events.push({ type: 'death', clownIndex: i as 0 | 1, cause: 'fall-off' });
     }
   }
