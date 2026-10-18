@@ -1,0 +1,236 @@
+{
+  "scenario": "b-chain",
+  "snapshotTicks": [
+    1,
+    30,
+    60,
+    120,
+    300
+  ],
+  "snapshots": {
+    "1": {
+      "phase": "playing",
+      "clowns": [
+        {
+          "x": 370,
+          "y": 496,
+          "vx": -1.9531809873878956,
+          "vy": -14.2,
+          "isFlying": true,
+          "isOnSeesaw": false,
+          "seesawSide": "left",
+          "isOnDivingBoard": false,
+          "divingBoardIndex": null
+        },
+        {
+          "x": 430,
+          "y": 496,
+          "vx": 0,
+          "vy": 0,
+          "isFlying": false,
+          "isOnSeesaw": true,
+          "seesawSide": "right",
+          "isOnDivingBoard": false,
+          "divingBoardIndex": null
+        }
+      ],
+      "balloons": [],
+      "seesaw": {
+        "x": 400,
+        "y": 520,
+        "width": 120,
+        "tilt": "right"
+      },
+      "currentJumpVelocity": -14.2,
+      "level": 1,
+      "stats": {
+        "score": 0,
+        "lives": 3,
+        "bonusJumps": 0
+      },
+      "events": [
+        {
+          "type": "landed-edge",
+          "clownIndex": 1,
+          "side": "right"
+        },
+        {
+          "type": "launched",
+          "clownIndex": 0,
+          "via": "chain",
+          "vx": -1.9531809873878956,
+          "vy": -14.2
+        }
+      ]
+    },
+    "30": {
+      "phase": "playing",
+      "clowns": [
+        {
+          "x": 313.357751365751,
+          "y": 214.70000000000027,
+          "vx": -1.9531809873878956,
+          "vy": -5.499999999999987,
+          "isFlying": true,
+          "isOnSeesaw": false,
+          "seesawSide": "left",
+          "isOnDivingBoard": false,
+          "divingBoardIndex": null
+        },
+        {
+          "x": 430,
+          "y": 496,
+          "vx": 0,
+          "vy": 0,
+          "isFlying": false,
+          "isOnSeesaw": true,
+          "seesawSide": "right",
+          "isOnDivingBoard": false,
+          "divingBoardIndex": null
+        }
+      ],
+      "balloons": [],
+      "seesaw": {
+        "x": 400,
+        "y": 520,
+        "width": 120,
+        "tilt": "right"
+      },
+      "currentJumpVelocity": -14.2,
+      "level": 1,
+      "stats": {
+        "score": 0,
+        "lives": 3,
+        "bonusJumps": 0
+      },
+      "events": []
+    },
+    "60": {
+      "phase": "playing",
+      "clowns": [
+        {
+          "x": 254.76232174411416,
+          "y": 189.2000000000006,
+          "vx": -1.9531809873878956,
+          "vy": 3.5000000000000107,
+          "isFlying": true,
+          "isOnSeesaw": false,
+          "seesawSide": "left",
+          "isOnDivingBoard": false,
+          "divingBoardIndex": null
+        },
+        {
+          "x": 430,
+          "y": 496,
+          "vx": 0,
+          "vy": 0,
+          "isFlying": false,
+          "isOnSeesaw": true,
+          "seesawSide": "right",
+          "isOnDivingBoard": false,
+          "divingBoardIndex": null
+        }
+      ],
+      "balloons": [],
+      "seesaw": {
+        "x": 400,
+        "y": 520,
+        "width": 120,
+        "tilt": "right"
+      },
+      "currentJumpVelocity": -14.2,
+      "level": 1,
+      "stats": {
+        "score": 0,
+        "lives": 3,
+        "bonusJumps": 0
+      },
+      "events": []
+    },
+    "120": {
+      "phase": "playing",
+      "clowns": [
+        {
+          "x": 198.3541681729257,
+          "y": 496,
+          "vx": 0,
+          "vy": 0,
+          "isFlying": false,
+          "isOnSeesaw": true,
+          "seesawSide": "left",
+          "isOnDivingBoard": false,
+          "divingBoardIndex": null
+        },
+        {
+          "x": 214.54999393038452,
+          "y": 233.50000000000023,
+          "vx": -1.7521669697016478,
+          "vy": -6.899999999999984,
+          "isFlying": true,
+          "isOnSeesaw": false,
+          "seesawSide": "right",
+          "isOnDivingBoard": false,
+          "divingBoardIndex": null
+        }
+      ],
+      "balloons": [],
+      "seesaw": {
+        "x": 228.3541681729257,
+        "y": 520,
+        "width": 120,
+        "tilt": "left"
+      },
+      "currentJumpVelocity": -14.399999999999999,
+      "level": 1,
+      "stats": {
+        "score": 0,
+        "lives": 3,
+        "bonusJumps": 0
+      },
+      "events": []
+    },
+    "300": {
+      "phase": "playing",
+      "clowns": [
+        {
+          "x": 600,
+          "y": 496,
+          "vx": 0,
+          "vy": 0,
+          "isFlying": false,
+          "isOnSeesaw": true,
+          "seesawSide": "left",
+          "isOnDivingBoard": false,
+          "divingBoardIndex": null
+        },
+        {
+          "x": 84,
+          "y": 214.91,
+          "vx": 3,
+          "vy": 0.03000000000000036,
+          "isFlying": true,
+          "isOnSeesaw": false,
+          "seesawSide": "left",
+          "isOnDivingBoard": false,
+          "divingBoardIndex": 0
+        }
+      ],
+      "balloons": [],
+      "seesaw": {
+        "x": 630,
+        "y": 520,
+        "width": 120,
+        "tilt": "left"
+      },
+      "currentJumpVelocity": -14,
+      "level": 1,
+      "stats": {
+        "score": 0,
+        "lives": 3,
+        "bonusJumps": 0
+      },
+      "events": []
+    }
+  },
+  "seed": 7
+}
