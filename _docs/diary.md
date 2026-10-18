@@ -336,3 +336,35 @@ Owner merges PR #15 (#4 closes). Then #5 (dev deploy): owner executes the two pl
 
 
 
+
+## 2026-10-18 — Cycle #6 (issue #5, PR #16): dev-deploy runbook; a false-positive FAIL resolved with evidence
+
+### What and why
+
+Owner executed the #5 platform steps manually (Render web service `clown-circus-reloaded`, Docker runtime, Frankfurt, health check `/health`, `DATABASE_URL` from the new Neon project — credentials only in platform secrets). Live verification at cycle open: `https://clown-circus-reloaded.onrender.com/health` → `200 {"status":"ok"}` in 0.27 s. The cycle's deliverable was the **reproducibility artifact**: `ops/dev-deploy-runbook.md` (+ a one-line `ops/README.md`), docs-only.
+
+### Outcome and independent verdicts
+
+[PR #16](https://github.com/lucapug/clown-circus-reloaded/pull/16) — 1 commit, 2 files, CI 6/6 green. [QA VERDICT: PASS](https://github.com/lucapug/clown-circus-reloaded/pull/16#issuecomment-6251093520) after amendment (original FAIL, see incident below; the audit trail of the false positive is preserved inside the verdict comment); [REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/16#issuecomment-6251085883) with 4 notes (Name field omission in the runbook's Render table; M4 "settings superseded" clause to add when the GHCR flow lands; trailer typo noted; Docker-command abbreviation). Merge pending the owner — **closing M1 at 5/5**.
+
+### Incident: a false-positive QA FAIL, resolved with evidence
+
+QA failed the PR for a third modified file (`_docs/backlog.md`) — actually the orchestrator's close-out commit `9975556`, landed on `main` AFTER the branch was cut, rendered reversed by a two-dot `git diff origin/main..HEAD`. Resolution: authoritative file list via `gh pr view --json files` / `gh pr diff` (merge-base) → exactly the 2 ops files; QA verified the topology itself (`rev-list` count on the file = 0; `origin/main` tip directly above the branch point) and amended its own comment in place (single-comment invariant kept, edit disclosed). Root cause fixed at source: `qa.md` prescribed the defective two-dot form — now defines `gh pr diff <n> --name-only` as the authoritative list (commit `1493167`).
+
+### Orchestrator stumbles (recorded honestly)
+
+Twice today I edited/committed while the working tree was left on a PR branch by a returning agent: one diary edit needed a re-read, and the qa.md fix commit landed on the PR branch first (moved to `main` by cherry-pick `1493167`; PR branch realigned to its remote state — no PR contamination, verified). Standing fix: the orchestrator checks `git status --short --branch` before ANY repo edit, and always returns the tree to `main` after agent cycles.
+
+### Measured ledger
+
+PM 167,803 · engineer 330,092 · QA 294,777 + 262,121 (amendment) · reviewer 126,529 (Explore/GLM-5.2) → **≈ 1.18M**, 77 tool uses. Stalls 0, escalations 0, rework 0 (the FAIL→PASS was an orchestrator-resolved false positive, not a code rework). Smallest cycle so far — consistent with a docs-only issue.
+
+### Lessons
+
+- The diff-method defect was MY prompt design, not agent error — third prompt-borne incident class fixed at the role-file source (after anti-hang and execute-only). Role files compound: every fix makes all future cycles safer.
+- Diverging independent verdicts are the system working: two readers, two diff methods, one dispute — resolved by primary evidence, transparently, with the audit trail left visible on the PR.
+- Docs-only cycles cost ~⅕ of a code cycle; the M6 documentation milestone will be cheap where it reuses this pattern.
+
+### Next
+
+Owner merges PR #16 (#5 closes; label removed; **M1 complete**). Then M2 opens with #6 (deterministic game core, TDD; first real test commit also removes `--passWithNoTests`). The critical path (#1→#6→#7→#8→#9→#10) is fully unblocked and C1 (Oct 21) looks comfortably ahead.
