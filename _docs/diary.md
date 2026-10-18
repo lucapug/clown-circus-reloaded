@@ -393,3 +393,5 @@ PM 331,375 (first attempt cancelled by interruption, unmeasured) · engineer 5,3
 ### Next
 
 Owner merges PR #17 (#6 closes; label removed). Then #7 (scoring/lives consequences on the event seam), #8 (progression + bonusJumps Option A), #9 (shell/screens + E2E hooks), #10/#11 parallelizable. C1 (Oct 21 EOD): game playable locally, core tests green — today's result makes that checkpoint look comfortably reachable.
+
+**Correction (same entry, same evening):** the diary commit above was initially made on the PR branch (third occurrence of the orchestrator's branch-switching stumble — this time immediately after writing the standing rule). Moved to `main` via cherry-pick; the PR branch realigned to its remote state before merge. The rule becomes mechanical: **no repo edit without a green `git status --short --branch` check in the same command**, and cycles always end with the tree returned to `main`.
