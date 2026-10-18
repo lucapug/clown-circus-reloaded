@@ -369,7 +369,6 @@ PM 167,803 · engineer 330,092 · QA 294,777 + 262,121 (amendment) · reviewer 1
 
 Owner merges PR #16 (#5 closes; label removed; **M1 complete**). Then M2 opens with #6 (deterministic game core, TDD; first real test commit also removes `--passWithNoTests`). The critical path (#1→#6→#7→#8→#9→#10) is fully unblocked and C1 (Oct 21) looks comfortably ahead.
 
-<<<<<<< HEAD
 ## 2026-10-18 — Cycle #7 (issue #6, PR #17): the deterministic game core, TDD flagship
 
 ### What and why
@@ -396,7 +395,6 @@ PM 331,375 (first attempt cancelled by interruption, unmeasured) · engineer 5,3
 Owner merges PR #17 (#6 closes; label removed). Then #7 (scoring/lives consequences on the event seam), #8 (progression + bonusJumps Option A), #9 (shell/screens + E2E hooks), #10/#11 parallelizable. C1 (Oct 21 EOD): game playable locally, core tests green — today's result makes that checkpoint look comfortably reachable.
 
 **Correction (same entry, same evening):** the diary commit above was initially made on the PR branch (third occurrence of the orchestrator's branch-switching stumble — this time immediately after writing the standing rule). Moved to `main` via cherry-pick; the PR branch realigned to its remote state before merge. The rule becomes mechanical: **no repo edit without a green `git status --short --branch` check in the same command**, and cycles always end with the tree returned to `main`.
-=======
 ### Owner decision + rework loop 2 (same cycle): free-side entry rule
 
 The owner clarified gameplay intent on the brief's two open questions: (1) a dead clown does not "return" — the NEXT clown enters, and the entry side is the **free end of the seesaw** (state-derived), overriding the baseline's always-right fall-off hardcode; note that `product-spec.md` §3.4 already prescribed free-side — the brief's adopted behavior was the deviation, and no role flagged the brief-vs-spec conflict (lesson: conflicts → spec wins + escalate; recorded). (2) High vs low entry trampoline stays OPEN (spec §3.1 pins only geometry; no design decision covers it) — interim high behind the named constant `RESPAWN_BOARD_HEIGHT_INDEX` with a TODO(owner), ACs assert the side rule not the height. Decision posted on #6 (comment 6252402875); engineer rework `562247f` (fall-off → free side, side-pair tests + no-seated fallback, only `golden-c-fall-off.json` regenerated — byte-gate verified independently: `a-seed42`'s fall-off death happened when free side WAS right); targeted re-checks both green: [QA (rework): PASS](https://github.com/lucapug/clown-circus-reloaded/pull/17#issuecomment-6252519499), [REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/17#issuecomment-6252585711). Rework cost 4.95M — the resume of the 5.3M engineer context (A7 pattern); correct price for a requirement change (P1.4 forbids mini-agents there).
@@ -406,6 +404,7 @@ The owner clarified gameplay intent on the brief's two open questions: (1) a dea
 ### Next
 
 Owner merges PR #17 (#6 closes; label removed; `RESPAWN_BOARD_HEIGHT_INDEX` decision queued). Then #7 (scoring/lives consequences on the event seam) — the core seam designed exactly for it.
->>>>>>> 784205d (Diary: owner free-side decision, rework loop 2 on PR #17, re-checks green; queued height + side-derivation questions)
 
 **Correction 2 (immediate):** the update above was committed a FOURTH time on the PR branch — the in-chain `git status` check informed but did not gate. The rule is now mechanical and tested by use: the FIRST command of every orchestrator repo-write is `git checkout main` (normalizes the tree unconditionally; agents may legitimately leave the tree on their PR branch), never a check-and-continue.
+
+**Correction 3:** the conflicted cherry-pick was committed with unresolved markers (`46c63fc`); resolved here. The checkout-first rule extends: after ANY cherry-pick/rebase, verify clean status before continuing — conflicts are resolved consciously, never auto-committed by a chained command.
