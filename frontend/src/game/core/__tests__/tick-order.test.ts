@@ -165,7 +165,7 @@ describe('pinned tick order (spec §3)', () => {
     expect(lander.vy).toBe(0);
     expect(state.clowns[1].isFlying).toBe(true);
     expect(state.currentJumpVelocity).toBe(INITIAL_JUMP_VELOCITY - JUMP_VELOCITY_STEP);
-    expect(state.seesaw.tilt).toBe('center'); // tilt computed after the chain launch
+    expect(state.seesaw.tilt).toBe('right'); // tilt is computed last: the lander stays seated on the right
   });
 
   it('decides game-over after the consequence reducer, emitting it last, with tilt from the final clowns', () => {
@@ -189,7 +189,8 @@ describe('pinned tick order (spec §3)', () => {
   it('drains the input queue at the tick boundary, before gravity', () => {
     // Initial state: clowns[1] sits on the upper-right board (740, 222).
     const { state, events } = step(playing({ balloons: [] }), [{ type: 'launch' }], createRng(1));
-    expect(events.map((e) => e.type)).toEqual(['launched']);
+    // Launch, then this same tick's board bounce as the clown leaves the board.
+    expect(events.map((e) => e.type)).toEqual(['launched', 'board-bounced']);
     const launched = expectEvent(events, 'launched');
     expect(launched.clownIndex).toBe(1);
     expect(launched.via).toBe('input');

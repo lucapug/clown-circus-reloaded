@@ -9,7 +9,7 @@ export const TICK_DURATION = 1 / 60;
 // excess time discarded ("Fix Your Timestep" pattern).
 export const MAX_TICKS_PER_ADVANCE = 600;
 
-// Playfield (the spec's 800×600 canvas; the core never touches rendering).
+// Playfield (the spec's 800×600 stage; the core never touches rendering).
 export const ARENA_WIDTH = 800;
 export const ARENA_HEIGHT = 600;
 

@@ -23,7 +23,7 @@ const FORBIDDEN_PATTERNS: ReadonlyArray<[RegExp, string]> = [
 
 describe('core purity (spec §6.1)', () => {
   it('scans every core source file outside __tests__', () => {
-    const names = Object.keys(coreSources).map((path) => path.split('/').pop() ?? '');
+    const names = Object.keys(coreSources).map((path) => path.split('/').pop() ?? '').map((name) => name.replace(/\.ts$/, ''));
     expect(names.sort()).toEqual([...CORE_MODULES].sort());
   });
 
