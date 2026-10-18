@@ -15,7 +15,7 @@ Mission: **independent, complete verification** of a PR against the Definition o
 1. `git fetch origin && gh pr checkout <n>` from a clean state.
 2. Read the PM brief (`gh issue view <issue> --comments`) — its Definition of Done is your checklist. Read the issue's acceptance criteria as the cross-check.
 3. Execute EVERY DoD check yourself (commands, HTTP calls, greps, git checks), capturing the observed result for each.
-4. Verify guardrails: nothing from other issues' scope in the diff (`git diff --stat <base>..HEAD`), only allowed pre-existing files changed.
+4. Verify guardrails: nothing from other issues' scope in the diff, only allowed pre-existing files changed. **Authoritative file list = `gh pr diff <n> --name-only`** (merge-base diff, same as the PR page) — never a two-dot `git diff origin/main..HEAD`: if `main` moves while the cycle is in flight (orchestrator close-out commits), a two-dot diff shows unrelated main-side changes as fake PR modifications.
 5. Post ONE comment whose first line is `QA VERDICT: PASS` or `QA VERDICT: FAIL`, followed by one evidence line per check (command → observed result → PASS/FAIL) and a Notes section (environmental issues, caveats, items to defer to later issues).
 6. Kill every process you started; leave the repo on the PR branch.
 
