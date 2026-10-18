@@ -297,6 +297,37 @@ Owner reviews/merges PR #14 (#2 closes; label removed by the orchestrator). Then
 
 **Update (same day):** owner merged PR #14 (`a6d216e`) after own review (including the Vitest-placeholder question — answered: deliberate scope decision; the `--passWithNoTests` flag will be removed in #6's first real-test commit so "no tests found" fails again). #2 closed, label removed, branch deleted, backlog map updated. M1 progress: 3 of 5 issues merged (#1, #3, #2); remaining #4 (OTel) and #5 (dev deploy).
 
+## 2026-10-18 — Cycle #5 (issue #4, PR #15): native OTel verified; second consecutive zero-rework cycle
+
+### What and why
+
+Issue #4 delivers the minimal ACTIVE OpenTelemetry instrumentation (final-rubric alignment): `fastapi[opentelemetry]` extra + a ~10-line LoggingHandler bridge in `backend/app/main.py` (attach in lifespan, detach on shutdown, one INFO line in `health()`), everything else env-only. Owner-side progress for #5 reported same morning (Render account + 2025 project exist; Neon account without projects — steps given: new Neon project, new separate Render web service with `DATABASE_URL`).
+
+### How — key technical findings (for the record)
+
+- The PM **verified the native-OTel mechanism against the FastAPI 0.143.2 tagged source and live docs**: `FASTAPI_OTEL_AUTO_CONFIGURE` is the enable switch (default False — the framework's dormant default IS the issue's requirement); extra = `fastapi[opentelemetry]` (sdk + otlp-proto-http ≥1.44.0); auto-config is http/protobuf-only (port 4318, not 4317) and runs before lifespan. This **corrected the orchestrator's 2026-10-15 note** on #4 (the env var is the enable switch, not a flag atop an always-on default).
+- Native logs fire only on validation failures/unhandled exceptions — so the bridge makes the correlation demo deterministic (a successful `/health` emits a correlated log record).
+- Engineer reproduced a brief discrepancy: the suggested Tempo `tags=` query returns empty on the current `otel-lgtm` image; TraceQL `{resource.service.name=…}` works (~20 s indexing delay) — adapted within the brief's "observables are the contract" clause, disclosed.
+
+### Outcome and independent verdicts
+
+[PR #15](https://github.com/lucapug/clown-circus-reloaded/pull/15) — 2 commits, 3 files (main.py +8/−1, pyproject, uv.lock). CI 6/6 green on the PR. [QA VERDICT: PASS](https://github.com/lucapug/clown-circus-reloaded/pull/15#issuecomment-6250746373): all 7 ACs re-run independently against a fresh `otel-lgtm` receiver — real three-signal correlation verified (Tempo trace `34554f79…`, Prometheus `http_server_request_duration_seconds_*` + `target_info` with service/environment/version labels, Loki record carrying the **same trace_id and span_id**); no-customer-data grep clean; no-env path a verified no-op. [REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/15#issuecomment-6250715034) — zero blockers/majors/minors; forward flags for M3 (unhandled-exception logs can carry messages → logging-content rule when `/scores` lands; `code_file_path` absolute paths in Loki labels) and M5 (env-only contract reusable for Grafana Cloud via `OTEL_EXPORTER_OTLP_HEADERS`). Merge pending the owner.
+
+### Measured ledger
+
+PM 321,402 · engineer 816,750 · QA 983,832 (container-based verification is expensive — noted for methodology) · reviewer 240,651 (Explore/GLM-5.2) → **≈ 2.36M**, 99 tool uses, ≈ 16.2 min agent wall time. Stalls 0, escalations 0, **rework 0 (second consecutive)**. Confounders unchanged (model mix, scope).
+
+### Lessons
+
+- Primary-source verification by the PM (FastAPI tagged source) beat both the orchestrator's earlier note and general knowledge — worth the ~6 tool uses it cost.
+- Two consecutive zero-rework cycles is now a pattern candidate: the role files' comment formats + severity taxonomy seem to be raising first-pass quality. Keep measuring.
+- QA's container-based batteries are the most token-expensive pass type; the P2 "artifact reuse" experiment remains deferred but this is where it would pay.
+
+### Next
+
+Owner merges PR #15 (#4 closes). Then #5 (dev deploy): owner executes the two platform steps (Neon project; separate Render web service with `DATABASE_URL`), agents deliver the `ops/` runbook and verify the public `/health`. M2 (#6, game core under TDD) starts as soon as M1 closes — the critical path is ready.
+
+
 
 
 
