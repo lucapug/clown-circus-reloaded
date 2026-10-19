@@ -461,3 +461,27 @@ PM 860,581 (included a /tmp byte-gate probe that predicted the divergent fixture
 ### Next
 
 Owner merges PR #22 (#19 closes; M2 at 4/6). Then **#9 (shell/screens/E2E hooks — the big one**, carrying the relays: death feedback keyed on the event even when jump-absorbed; HUD "Jumps" visibility design call), **#10 services/offline**, **#11 audio**, then the conditional **#20** (only if on schedule). C1 (Oct 21 EOD): on track.
+
+## 2026-10-19 — Cycle #11 (issue #9, PR #23): the game becomes playable — biggest cycle, live-browser QA
+
+### What and why
+
+The presentation cycle over the deterministic core: canvas shell (verbatim visual port of the baseline GameCanvas draw code), HUD (Jumps always visible — owner decision), start/game-over screens, floating texts from events (presentation queue), LeaderboardService thin boundary + stub for #10, DEV-gated `window.__game` debug API for M4's Playwright, and the one permitted core change: `advance` gained an optional `inputs` parameter drained on the first executed tick (the PM found the #7 wiring contract couldn't deliver inputs otherwise; fixtures byte-untouched, 74 prior core tests unchanged).
+
+### Outcome and independent verdicts
+
+[PR #23](https://github.com/lucapug/clown-circus-reloaded/pull/23) — 7 commits, 22 files, 114 tests (74 core untouched + 40 new RTL). CI 6/6. [QA VERDICT: PASS](https://github.com/lucapug/clown-circus-reloaded/pull/23#issuecomment-6268104618) — first **live-browser verification** of the project: dev server + real clicks/keys; observed a jump-absorbed death in-browser (bonusJumps 2→1, lives stayed 3) and the full game-over→save→Play Again flow; production-gating grep on dist; kernel-hygiene greps. [REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/23#issuecomment-6268003968) — line-by-line visual conformance vs the baseline ("verbatim port"), DEV-gating re-verified in the shipped dist, relays recorded: M4 (`advanceTicks` + live-loop interleave → `reset(seed)` before exact-state assertions) and #10 (service errors swallowed → always-resolve or revisit; `rank` render-inert). **Visual parity judgment is the owner's**, via the side-by-side runbook in the PR body (run 2025 locally from the pinned clone + 2026 locally, compare). Merge pending the owner.
+
+### Measured ledger (the largest cycle)
+
+PM 556,604 · engineer 6,820,373 (largest single pass — UI surface + RTL stack) · QA 2,109,551 (live-browser first) · reviewer 941,312 (line-by-line visual conformance) → **≈ 10.43M**, 244 tool uses, ≈ 49 min agent wall time. Stalls 0, escalations 0, rework 0. The scale is intrinsic (half a UI + a testing stack); the M2 tail cycles (#10, #11, #20) are all smaller surfaces.
+
+### Lessons
+
+- The PM's pre-flight discovery (the `advance` inputs gap) prevented what would have been a mid-#9 architecting scramble — the brief-and-verify pattern at its best.
+- Live-browser QA is worth its cost exactly once per UI-heavy milestone; component tests carry the repeatable load.
+- The two independent readers again split the work productively: runtime behavior (QA) vs normative conformance (reviewer) on the same PR, neither reading the other.
+
+### Next
+
+Owner reviews (side-by-side eyeball per runbook) and merges PR #23 (#9 closes; M2 4/6). Then #10 (services + localStorage offline), #11 (audio), conditional #20 — and C1 (Oct 21 EOD) with the game playable on dev.
