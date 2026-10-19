@@ -1,7 +1,6 @@
 import { EDGE_LANDING_BONUS, LIVES_ON_DEATH, LIVES_ON_LEVEL_UP } from './constants';
-import type { GameEvent } from './events';
 import { getBalloonScore, getBonusJumpsForRowClear, getRowBonus } from './scoring';
-import type { ConsequenceReducer, GameState } from './types';
+import type { ConsequenceReducer } from './types';
 
 // The shipped ConsequenceReducer (issue #7, design decision 3): a PURE fold
 // over the tick's events IN EMISSION ORDER, returning a new GameState. It
