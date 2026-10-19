@@ -487,3 +487,22 @@ PM 556,604 · engineer 6,820,373 (largest single pass — UI surface + RTL stack
 Owner reviews (side-by-side eyeball per runbook) and merges PR #23 (#9 closes; M2 4/6). Then #10 (services + localStorage offline), #11 (audio), conditional #20 — and C1 (Oct 21 EOD) with the game playable on dev.
 
 **Recurrence note (cycle #11 close-out):** the diary commit stranded on the PR branch once more (5th) — this time the checkout was omitted entirely from the command chain while the status line showed the branch. Cherry-picked to main (`cd4d5bc`), PR branch realigned, no contamination. The definitive habit: the diary pass is a STANDALONE command whose first token is `git checkout main`; no other command may share its chain.
+
+## 2026-10-19 — Owner gameplay consultation #2: jump earning v2 (launch streak) — spec §3.3 rewritten, conditional issue #24
+
+### What and why
+
+The owner, play-testing, identified a real design redundancy: the blue-row clear and the level completion nearly always coincide (the blue row sits on top; a completing flight pops it last), so the +1 jump reward measured progression, not skill. Their proposal: reward **consecutive launch cycles without a death** instead (safe edge landing → chain launch = one cycle; death resets). After clarifying the definition (their land-and-relaunch cycles, adopted — better than counting all launches), the mechanics estimate (~10-15 cycles per deathless level) drove the threshold choice: **100 would practically never fire (the 2025 dead-stat disease); 25 ≈ two deathless levels — occasionally achievable, and calibratable later with real M5 telemetry** (games played, jumps earned, max streak — the first concrete use of the observability milestone).
+
+### Owner decisions
+
+Threshold **25** (calibration parameter, lives in constants.ts, tune via M5 data); the streak **replaces** blue-row earning (blue row keeps 1000 points only — no double economy); death resets the streak (plus the #8 consumption rules); diving-board launches don't count. Spec §3.3 rewritten to v2 (commit `08b82a7`) including the splash lesson codified: HUD must show streak progress (`Streak: k/25`) and the start screen must state the mechanic — a reward the player cannot see accumulating is indistinguishable from randomness. Conditional issue [#24](https://github.com/lucapug/clown-circus-reloaded/issues/24) created (same binding scheduling discipline as #20: after #11 + #9/#10 on track, or defer to November with the spec written; owner picks which idea takes a single-slot window).
+
+### Lessons
+
+- Owner play-testing surfaced TWO layers the tests could not see: a communication gap (the mechanic was incomprehensible without a hint) and a design gap (the reward measured progression, not skill). Automated verification pins behavior; only play-testing evaluates whether the behavior is *worth having* and *understood*.
+- The event seam made the v2 rule almost free to specify: `launched`/`death` events already carry everything the streak fold needs.
+
+### Next
+
+Owner merges PR #23 (after their side-by-side re-play) → #9 closes, M2 4/6. Then #10 → #11 → the conditional slot (owner picks #20 or #24). C1 Oct 21 EOD.
