@@ -553,3 +553,27 @@ PM 413,098 · engineer 2,826,398 + 684,759 (rework) · QA 931,179 · reviewer 40
 ### Next
 
 Owner reviews PR #26 (timbre + the two listening notes) and merges → **#11 closes, M2 5/6→ all 6 MUSTs done**; then the conditional slot (owner picks #20 entry-height or #24 streak — both specified), and C1 Oct 21 EOD. M3 (backend/DB/contract) is next after M2.
+
+## 2026-10-19 — Fuzz investigation (2 rounds) + cycle #14 (issue #27, PR #28): lives-floor bugfix
+
+### What and why
+
+The owner, play-testing PR #26, reported an "inexplicable game-over" while playing level 2 with a jump earned. Two fuzz rounds on the deterministic core investigated: round 1 (300 games, random policies) found NO reproduction and quantified the perception artifact (12% of gameovers fire with a clown seated and visibly alive — the flying clown's death takes the abstract life; every death instantly respawns a board clown, so two clowns are always on screen at gameover; jump-absorbed deaths show SPLAT without a pip drop). Round 2 injected the owner's exact uncovered state (level 2, lives 4, jumps 1 — round 1's policies never completed level 1): **3,513 gameovers, zero with lives > 0** — the report is not reproducible in the core. Round 2 DID find the adjacent real defect: **lives can reach −1** on a same-tick double death (double-tap launch → two flying clowns → two death events at lives 1 → −1). Gate fires correctly (≤ 0), but the state/HUD read −1.
+
+### Outcome and independent verdicts
+
+Issue [#27](https://github.com/lucapug/clown-circus-reloaded/issues/27) created from the minimized repro (seed 22). [PR #28](https://github.com/lucapug/clown-circus-reloaded/pull/28) — 2 commits (red regression test from the minimized repro → one-line clamp fix `Math.max(0, ...)`), 171 tests, CI 6/6, fixtures byte-stable. [QA VERDICT: PASS](https://github.com/lucapug/clown-circus-reloaded/pull/28#issuecomment-6276130110) — reproduced the RED on main's code in a /tmp clone independently. [REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/28#issuecomment-6276160836) — 1 non-blocking [minor] (test assertion precision; fold directly asserted by the property test) + 2 notes. Merge pending the owner (gates now open: PR #26 audio + PR #28).
+
+### Measured ledger
+
+Investigation rounds 1-2: 1,050,638 + 3,117,055 = 4.17M. Cycle #14: PM n/a (orchestrator-specified bugfix from the minimized repro) · engineer 1,433,882 · QA 392,922 · reviewer 314,555 → **≈ 2.14M**. Zero stalls, zero rework.
+
+### Lessons
+
+- **Fuzzing the deterministic core is the highest-value verification so far**: it (a) closed the owner's report with evidence (3,513 gameovers, zero violations in the claimed region — a perception artifact quantified), (b) found a real adjacent defect with a minimized repro, (c) cost ~4.2M across two rounds. The detector canaries (injected defects tripping the invariants) are what make the green trustworthy.
+- Coverage gap insight: round 1's random policies never completed level 1 — state-injected rounds are necessary complements to policy-fuzzing for progression-gated regions.
+- The slim regression test keeps the fuzz policy code verbatim (draw-order preservation) — a reduced extraction diverged (tick 221 vs 233); determinism repros must copy the WHOLE draw sequence.
+
+### Next
+
+Owner merges PR #28 (+ PR #26 after the timbre listen) → #27/#11 close, **M2 6/6 complete**. Then the conditional slot (owner picks #20 or #24), C1 Oct 21 EOD, and M3 (backend/DB/contract, with decision C log-only + the #10 contract-alignment relay).
