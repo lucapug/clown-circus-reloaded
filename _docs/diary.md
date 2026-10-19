@@ -416,3 +416,25 @@ Owner merges PR #17 (#6 closes; label removed; `RESPAWN_BOARD_HEIGHT_INDEX` deci
 - **A (consultation, no decision yet):** the owner proposed a difficulty-progression concept (per-level speeds; high/low entry randomization from ~level 3; birds altering trajectories later; combinations) and asked for a motivated recommendation against the Oct-26 submission, explicitly not presuming implementation. Verification performed on the actual core: `levelMult = 1+0.25(level−1)` scales **launch vx only** (engine.ts:117/126/293); launch vy is per-bounce progression (−0.2 → −17, reset on death), NOT per-level; the seesaw is mouse-driven (no speed parameter exists); the balloon grid regenerates **identically** each level; entry height is the isolated `RESPAWN_BOARD_HEIGHT_INDEX` (interim high). Recommendation delivered to the owner (see conversation; summary in the next diary entry once decided): formalize what already exists (M1), implement high/low entry randomization as one small cycle if the M2 tail stays on track (M2), defer the birds mechanic and combinations to the second attempt (M3/M4 — new entity + physics + rendering on the parity-critical core, zero rubric value, competes with the 5-point ops milestone). PR #18 (#7) still at the owner's merge gate.
 
 **Update (same day):** owner merged PR #18 (`af6de95`) — #7 closed, M2 at 2/6. Owner decisions on the progression consultation (A): M1 formalized as already-present (levelMult on vx; vy stays per-bounce per the pinned spec — no change); **M2 = issue #20** (entry-height randomization from **level 4**, 50/50, seeded RNG, conditional on #11 + #9/#10 on track, defer without compressing gates — owner-mandated wording); **M3/M4 (birds, combinations) → second attempt**, recorded in plan §6's deferred list. Plan updated and pushed.
+
+## 2026-10-19 — Cycles #8 (issue #7, PR #18) and #9 (issue #8, PR #21): scoring + bonusJumps — the event seam pays off
+
+### What and why
+
+#7 merged by the owner (`af6de95`, M2 at 2/6): scoring/lives consequences as a pure fold on the #6 event seam — kernel untouched, single source of truth realized (the 2025 tested-but-never-imported defect now structurally impossible), 67 tests. #8 delivered the approved 2026 design decision A: one bonusJump is consumed instead of a life on death (per-event, emission order; same-tick earn-then-spend pinned as correct — PM's disclosed judgment call, reviewer concurred), plus the exhaustiveness `never` guard on the fold (PR #18's reviewer note, pre-assigned here).
+
+### Outcome and independent verdicts
+
+[PR #21](https://github.com/lucapug/clown-circus-reloaded/pull/21) — 2 commits (red tests-only → green), 4 files, 73 tests. [QA VERDICT: PASS](https://github.com/lucapug/clown-circus-reloaded/pull/21#issuecomment-6264782331): every §3.3 AC live-path; the guard's compile-enforcement independently reproduced in /tmp (injected unhandled variant → TS2322) AND the brief's literal `?.type` form compiled to confirm the engineer's deviation was necessary (TS2339). [REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/21#issuecomment-6264768942), zero findings above [note]; relays for #9: death feedback (SPLAT/sound) must key off the `death` event even when jump-absorbed (spec §3.3), and the HUD "Jumps" visibility needs a design call. Engine.ts and golden fixtures byte-identical to main in both PRs.
+
+### Measured ledger (cycle #9)
+
+PM 434,950 · engineer 1,578,345 · QA 861,504 · reviewer 188,487 → **≈ 3.06M**, 116 tool uses. Zero stalls, zero escalations, zero rework — a gameplay-behavior change landed in one pass at the cost of a docs cycle. The #6 seam design is directly responsible: consequences changes never touch the kernel.
+
+### Decisions recorded this session
+
+B → issue #19 (side-derivation unification, after #8); C → log-only (question closed); A → M1 formalized as already-present, M2 = issue #20 (level 4, 50/50, seeded, conditional on #11 + #9/#10 on track, defer without compressing gates — owner-mandated), M3/M4 (birds, combinations) → second attempt (plan §6 updated, `a9c0679`).
+
+### Next
+
+Owner merges PR #21 (#8 closes; M2 at 3/6). Then #19 (small, side unification) and #9 (shell/screens/E2E hooks — the big one; carries the #9 relays above). C1 (Oct 21): on track.
