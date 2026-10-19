@@ -485,3 +485,5 @@ PM 556,604 · engineer 6,820,373 (largest single pass — UI surface + RTL stack
 ### Next
 
 Owner reviews (side-by-side eyeball per runbook) and merges PR #23 (#9 closes; M2 4/6). Then #10 (services + localStorage offline), #11 (audio), conditional #20 — and C1 (Oct 21 EOD) with the game playable on dev.
+
+**Recurrence note (cycle #11 close-out):** the diary commit stranded on the PR branch once more (5th) — this time the checkout was omitted entirely from the command chain while the status line showed the branch. Cherry-picked to main (`cd4d5bc`), PR branch realigned, no contamination. The definitive habit: the diary pass is a STANDALONE command whose first token is `git checkout main`; no other command may share its chain.
