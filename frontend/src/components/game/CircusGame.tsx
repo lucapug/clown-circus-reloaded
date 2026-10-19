@@ -61,9 +61,10 @@ const CircusGameInner = ({
   const { frame, start, queueInput } = loop;
   const phase = frame.state.phase;
 
-  // One shared start path for SPACE-at-idle and Play Again (#11 decision 2/6):
-  // silence anything in flight (a mid-flight game-over jingle), restart the
-  // loop, then bring the ambient pass back.
+  // One shared start path for every entry point (#11 decision 2/6) —
+  // START GAME button, SPACE-at-idle, Play Again: silence anything in flight
+  // (a mid-flight game-over jingle), restart the loop, then bring the
+  // ambient pass back.
   const startGame = useCallback(() => {
     audio.stopAll();
     start();
@@ -151,7 +152,7 @@ const CircusGameInner = ({
         />
 
         {phase === 'idle' && (
-          <StartScreen onStart={() => start()} leaderboard={leaderboard} offline={offline} />
+          <StartScreen onStart={() => startGame()} leaderboard={leaderboard} offline={offline} />
         )}
 
         {phase === 'gameover' && (

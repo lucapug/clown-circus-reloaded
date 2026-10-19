@@ -180,6 +180,21 @@ describe('CircusGame audio start path (issue #11 DoD 2 — jingle stops when a n
     expect(loop.start).toHaveBeenCalledTimes(1);
     expect(audio.stopAll.mock.invocationCallOrder[0]).toBeLessThan(audio.startBackground.mock.invocationCallOrder[0]);
   });
+
+  it('the START GAME button runs the same audio start sequence (rework loop 1)', () => {
+    const loop = fakeLoop('idle');
+    const audio = fakeAudio();
+    render(<CircusGame loop={loop} service={noopService()} audio={audio} />);
+    fireEvent.click(screen.getByRole('button', { name: 'START GAME' }));
+    expect(audio.stopAll).toHaveBeenCalledTimes(1);
+    expect(audio.startBackground).toHaveBeenCalledTimes(1);
+    expect(loop.start).toHaveBeenCalledTimes(1);
+    const stopOrder = audio.stopAll.mock.invocationCallOrder[0];
+    const startOrder = vi.mocked(loop.start).mock.invocationCallOrder[0];
+    const bgOrder = audio.startBackground.mock.invocationCallOrder[0];
+    expect(stopOrder).toBeLessThan(startOrder);
+    expect(startOrder).toBeLessThan(bgOrder);
+  });
 });
 
 describe('CircusGame leaderboard save flow over the service seam (issue #9 DoD c, #10 outcomes)', () => {
