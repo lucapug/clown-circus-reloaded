@@ -4,12 +4,16 @@ import { PixelButton } from './ui';
 interface StartScreenProps {
   onStart: () => void;
   leaderboard: LeaderboardEntry[];
+  /** #10: true when the snapshot came from the offline cache, not the API. */
+  offline?: boolean;
 }
 
 // Baseline StartScreen copy and layout, verbatim (2025 parity): per-letter
 // rainbow bouncing titles, HOW TO PLAY, SCORING legend, HIGH SCORES top-3
 // only when entries exist, START GAME, "Click or press SPACE to begin".
-export const StartScreen = ({ onStart, leaderboard }: StartScreenProps) => {
+// #10 adds the one sanctioned line: an offline badge beside HIGH SCORES
+// (only when cached entries exist; offline-and-empty keeps the hidden block).
+export const StartScreen = ({ onStart, leaderboard, offline = false }: StartScreenProps) => {
   return (
     <div className="absolute inset-0 bg-background/95 flex items-center justify-center z-10">
       <div className="text-center max-w-lg mx-4">
@@ -118,7 +122,14 @@ export const StartScreen = ({ onStart, leaderboard }: StartScreenProps) => {
 
         {leaderboard.length > 0 && (
           <div data-testid="high-scores" className="bg-card p-4 rounded-lg arcade-border mb-8">
-            <h3 className="text-sm font-bold text-accent mb-2 pixel-font">HIGH SCORES</h3>
+            <div className="flex items-baseline justify-between mb-2">
+              <h3 className="text-sm font-bold text-accent pixel-font">HIGH SCORES</h3>
+              {offline && (
+                <span data-testid="offline-indicator" className="text-xs text-muted-foreground">
+                  Offline — showing saved scores
+                </span>
+              )}
+            </div>
             <div className="space-y-1">
               {leaderboard.slice(0, 3).map((entry, i) => (
                 <div key={i} data-testid="high-score-row" className="flex justify-between text-sm">

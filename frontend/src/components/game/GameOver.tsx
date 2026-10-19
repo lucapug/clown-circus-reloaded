@@ -1,28 +1,57 @@
 import { useState } from 'react';
-import type { LeaderboardEntry } from '../../services/leaderboard';
+import type { LeaderboardEntry, SubmitScoreOutcome } from '../../services/leaderboard';
 import { PixelButton, PixelInput } from './ui';
 
 interface GameOverProps {
   score: number;
   onRestart: () => void;
-  /** Save flow (issue #9 decision 3): submit the TRIMMED name, then the caller refetches the leaderboard. */
-  onSaveScore: (name: string, score: number) => Promise<void> | void;
+  /**
+   * Save flow (#9 decision 3, reshaped by #10 per the #23 review relay):
+   * submit the TRIMMED name and surface the outcome — the caller refetches
+   * the leaderboard. Every outcome renders honestly; a 4xx never shows
+   * "Saved".
+   */
+  onSaveScore: (name: string, score: number) => Promise<SubmitScoreOutcome>;
   leaderboard: LeaderboardEntry[];
 }
 
-// Baseline GameOver, verbatim layout: GAME OVER, 6-digit final score, name
-// input truncated at 10 chars, save disabled until non-empty, "Score Saved!"
-// after the save flow resolves, the duplicated-list 14.4s scroll loop over
-// the top 10, "No scores yet" when empty, Play Again.
+// Baseline GameOver layout: GAME OVER, 6-digit final score, name input
+// truncated at 10 chars, save disabled until non-empty, then the honest
+// #10 outcome message, the duplicated-list 14.4s scroll loop over the top
+// 10, "No scores yet" when empty, Play Again.
 export const GameOver = ({ score, onRestart, onSaveScore, leaderboard }: GameOverProps) => {
   const [name, setName] = useState('');
-  const [saved, setSaved] = useState(false);
+  const [outcome, setOutcome] = useState<SubmitScoreOutcome | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
     const trimmed = name.trim();
     if (!trimmed) return;
-    await onSaveScore(trimmed, score);
-    setSaved(true);
+    setSaving(true);
+    try {
+      setOutcome(await onSaveScore(trimmed, score));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveMessage = (o: SubmitScoreOutcome) => {
+    if (o.status === 'saved') return <div className="mb-6 text-accent pixel-font">Score Saved!</div>;
+    if (o.status === 'queued')
+      return (
+        <div data-testid="save-queued" className="mb-6 text-accent pixel-font">
+          Saved offline — will sync
+        </div>
+      );
+    return (
+      <div data-testid="save-rejected" className="mb-6 text-destructive pixel-font">
+        {o.reason === 'validation'
+          ? 'Could not save: invalid name or score'
+          : o.reason === 'conflict'
+            ? 'Could not save: sync conflict'
+            : 'Could not save: request rejected'}
+      </div>
+    );
   };
 
   return (
@@ -39,7 +68,7 @@ export const GameOver = ({ score, onRestart, onSaveScore, leaderboard }: GameOve
           </div>
         </div>
 
-        {!saved ? (
+        {!outcome ? (
           <div className="mb-6 space-y-3">
             <PixelInput
               type="text"
@@ -50,12 +79,17 @@ export const GameOver = ({ score, onRestart, onSaveScore, leaderboard }: GameOve
               data-testid="player-name"
               className="text-center text-foreground pixel-font"
             />
-            <PixelButton onClick={handleSave} disabled={!name.trim()} data-testid="save-score" className="w-full pixel-font">
-              Save Score
+            <PixelButton
+              onClick={handleSave}
+              disabled={!name.trim() || saving}
+              data-testid="save-score"
+              className="w-full pixel-font"
+            >
+              {saving ? 'Saving…' : 'Save Score'}
             </PixelButton>
           </div>
         ) : (
-          <div className="mb-6 text-accent pixel-font">Score Saved!</div>
+          saveMessage(outcome)
         )}
 
         <div className="mb-6">

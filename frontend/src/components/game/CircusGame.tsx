@@ -2,18 +2,19 @@ import { useCallback, useEffect, useState } from 'react';
 import { useGameLoop } from '../../game/useGameLoop';
 import type { GameLoopApi } from '../../game/useGameLoop';
 import {
-  createStubLeaderboardService,
+  createDefaultLeaderboardService,
   type LeaderboardEntry,
   type LeaderboardService,
-} from '../../services/leaderboard';
+  type SubmitScoreOutcome,
+} from '../../services';
 import { GameCanvas } from './GameCanvas';
 import { GameHUD } from './GameHUD';
 import { GameOver } from './GameOver';
 import { StartScreen } from './StartScreen';
 
-// Testability seam (issue #9, decision 5): `loop` and `service` default to
-// the real useGameLoop() and the stub leaderboard service; flow tests inject
-// a fake loop and a mock service instead.
+// Testability seam (issue #9, decision 5; #10 swaps the stub for the real
+// factory): `loop` and `service` default to the real useGameLoop() and
+// createDefaultLeaderboardService(); flow tests inject fakes instead.
 export interface CircusGameProps {
   loop?: GameLoopApi;
   service?: LeaderboardService;
@@ -32,34 +33,52 @@ const CircusGameLive = ({ service }: { service?: LeaderboardService }) => {
 };
 
 const CircusGameInner = ({ loop, service }: { loop: GameLoopApi; service?: LeaderboardService }) => {
-  const [leaderboardService] = useState<LeaderboardService>(() => service ?? createStubLeaderboardService());
+  const [leaderboardService] = useState<LeaderboardService>(() => service ?? createDefaultLeaderboardService());
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [offline, setOffline] = useState(false);
+  const [droppedCount, setDroppedCount] = useState(0);
   const { frame, start, queueInput } = loop;
   const phase = frame.state.phase;
 
+  // #10: drain the offline queue BEFORE fetching, so the refreshed list
+  // includes just-synced rows; drops are surfaced once via the sync notice.
   useEffect(() => {
     let cancelled = false;
-    leaderboardService
-      .fetchLeaderboard()
-      .then((entries) => {
-        if (!cancelled) setLeaderboard(entries);
-      })
-      .catch(() => {});
+    const load = async () => {
+      try {
+        const drain = await leaderboardService.drainPendingSubmissions();
+        if (!cancelled && drain.dropped > 0) setDroppedCount(drain.dropped);
+      } catch {
+        // a drain failure must never block the fetch below
+      }
+      try {
+        const snapshot = await leaderboardService.fetchLeaderboard();
+        if (cancelled) return;
+        setLeaderboard(snapshot.entries);
+        setOffline(snapshot.source === 'cached');
+      } catch {
+        // keep whatever list we have; the service already fell back to cache
+      }
+    };
+    load();
     return () => {
       cancelled = true;
     };
   }, [leaderboardService]);
 
-  // The #9 save flow over the service boundary: submit the (already
-  // trimmed) name, then refresh the list (#10 replaces the stub).
+  // The save flow over the service boundary (#9 + the #23 honesty fix):
+  // submit the (already trimmed) name, surface the outcome to GameOver, and
+  // refresh the list on a non-definitive-rejected result so just-saved rows
+  // (or the fresh cache) show up.
   const saveScore = useCallback(
-    async (name: string, score: number) => {
-      try {
-        await leaderboardService.submitScore(name, score);
-        setLeaderboard(await leaderboardService.fetchLeaderboard());
-      } catch (error) {
-        console.error('Failed to save score:', error);
+    async (name: string, score: number): Promise<SubmitScoreOutcome> => {
+      const outcome = await leaderboardService.submitScore(name, score);
+      if (outcome.status !== 'rejected') {
+        const snapshot = await leaderboardService.fetchLeaderboard();
+        setLeaderboard(snapshot.entries);
+        setOffline(snapshot.source === 'cached');
       }
+      return outcome;
     },
     [leaderboardService],
   );
@@ -85,6 +104,12 @@ const CircusGameInner = ({ loop, service }: { loop: GameLoopApi; service?: Leade
     <div className="flex flex-col items-center gap-4 p-4 min-h-screen">
       <GameHUD score={frame.state.stats.score} lives={frame.state.stats.lives} bonusJumps={frame.state.stats.bonusJumps} />
 
+      {droppedCount > 0 && (
+        <p data-testid="sync-notice" className="text-xs text-destructive pixel-font" role="status">
+          {droppedCount} offline score(s) rejected by server
+        </p>
+      )}
+
       <div className="relative">
         <GameCanvas
           state={frame.state}
@@ -95,7 +120,9 @@ const CircusGameInner = ({ loop, service }: { loop: GameLoopApi; service?: Leade
           }}
         />
 
-        {phase === 'idle' && <StartScreen onStart={() => start()} leaderboard={leaderboard} />}
+        {phase === 'idle' && (
+          <StartScreen onStart={() => start()} leaderboard={leaderboard} offline={offline} />
+        )}
 
         {phase === 'gameover' && (
           <GameOver
