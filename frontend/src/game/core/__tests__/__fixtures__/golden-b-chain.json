@@ -204,15 +204,15 @@
           "divingBoardIndex": null
         },
         {
-          "x": 84,
+          "x": 716,
           "y": 214.91,
-          "vx": 3,
+          "vx": -3,
           "vy": 0.03000000000000036,
           "isFlying": true,
           "isOnSeesaw": false,
-          "seesawSide": "left",
+          "seesawSide": "right",
           "isOnDivingBoard": false,
-          "divingBoardIndex": 0
+          "divingBoardIndex": 2
         }
       ],
       "balloons": [],
