@@ -107,7 +107,7 @@ MoSCoW: **MUST** = rubric-critical; **SHOULD** = high value with defined fallbac
 
 **C1 STOP-and-rescope branch:** if the core loop is not playable by Oct 21 EOD — freeze physics fidelity to "playable parity" (core loop complete; fine physics nuance to the second attempt) and protect M3–M7 unchanged, because backend, CD, pack, and docs are irreplaceable for the rubric while physics nuance is recoverable.
 
-**Deferred to the second attempt (WONT v1 unless ahead of schedule):** `/loop` over the backlog; parallel worktrees; token-compression trial; second external security reviewer; custom MCP mini-server; mobile/touch input; gameplay polish; performance work; extended E2E; deeper dashboards; peer-feedback integration.
+**Deferred to the second attempt (WONT v1 unless ahead of schedule):** `/loop` over the backlog; parallel worktrees; token-compression trial; second external security reviewer; custom MCP mini-server; mobile/touch input; gameplay progression additions — **birds/trajectory mechanic and level combinations** (owner decision 2026-10-19, after evaluating the progression concept against the deadline: new entity + physics + rendering on the parity-critical core, zero rubric value, competes with the 5-point ops milestone); performance work; extended E2E; deeper dashboards; peer-feedback integration. **Conditional M2 addition:** entry-height randomization from level 4, 50/50 seeded (issue #20) — runs only after #11 if #9/#10 are on schedule; defer without compressing gates (owner-mandated).
 
 ## 7. Review-load and rework controls
 
