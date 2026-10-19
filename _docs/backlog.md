@@ -20,9 +20,11 @@ graph TD
         I8["#8 Progression + bonusJumps (2026 dec. A) ✅ merged"]
         I9["#9 Canvas shell, HUD, screens ✅ merged"]
         I10["#10 Services + mocks + offline queue ✅ merged"]
-        I11["#11 Synthesized audio"]
+        I11["#11 Synthesized audio ✅ merged"]
         I19["#19 Free-side unification ✅ merged"]
         I20["#20 Entry-height randomization (level 4, 50/50) — CONDITIONAL"]
+        I24["#24 Jump earning v2: 25-launch streak — CONDITIONAL"]
+        I27["#27 Lives floor at 0 ✅ merged"]
     end
 
     I1 --> I3
@@ -40,6 +42,8 @@ graph TD
     I8 --> I19
     I19 -.-> I20
     I11 -.-> I20
+    I7 -.-> I24
+    I24 -.-> I27
 ```
 
 **Critical path (longest chain):** #1 → #6 → #7 → #8 → #9 → #10 — the sequence the C1 checkpoint (Oct 21 EOD, plan §6) effectively watches; slippage here triggers the ordered cut list.
