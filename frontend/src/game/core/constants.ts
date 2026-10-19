@@ -103,6 +103,11 @@ export const ROW_BONUS_POINTS: Record<(typeof BALLOON_ROW_COLORS)[number], numbe
   blue: 1000,
 };
 export const EDGE_LANDING_BONUS = 10; // "Bounce (land on seesaw edge)", §3.2
-export const BONUS_JUMPS_FOR_BLUE_ROW = 1; // §3.3 EARNING only; spending is #8
+export const BONUS_JUMPS_FOR_BLUE_ROW = 1; // §3.3 EARNING only; spending is BONUS_JUMPS_ON_DEATH
 export const LIVES_ON_LEVEL_UP = 1; // §3.5
 export const LIVES_ON_DEATH = 1; // §3.5
+// §3.3 CONSUMPTION — 2026 design decision A (an explicit owner decision of
+// 2026-10-15, NOT inferred 2025 intent): when a death would occur and
+// bonusJumps > 0, one bonus jump is spent instead of one life; the death
+// sequence itself is otherwise unchanged (issue #8).
+export const BONUS_JUMPS_ON_DEATH = 1;
