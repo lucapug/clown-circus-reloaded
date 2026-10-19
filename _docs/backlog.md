@@ -21,6 +21,8 @@ graph TD
         I9["#9 Canvas shell, HUD, screens"]
         I10["#10 Services + mocks + offline queue"]
         I11["#11 Synthesized audio"]
+        I19["#19 Free-side unification ✅ merged"]
+        I20["#20 Entry-height randomization (level 4, 50/50) — CONDITIONAL"]
     end
 
     I1 --> I3
@@ -35,6 +37,9 @@ graph TD
     I8 --> I9
     I9 --> I10
     I9 --> I11
+    I8 --> I19
+    I19 -.-> I20
+    I11 -.-> I20
 ```
 
 **Critical path (longest chain):** #1 → #6 → #7 → #8 → #9 → #10 — the sequence the C1 checkpoint (Oct 21 EOD, plan §6) effectively watches; slippage here triggers the ordered cut list.
