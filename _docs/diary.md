@@ -530,3 +530,26 @@ PM 365,783 · engineer 6,067,368 · QA 2,522,196 · reviewer 463,026 · mini-age
 ### Next
 
 Owner merges PR #25 (#10 closes; M2 5/6). Then **#11 (audio)** — last MUST of M2, carrying the new anti-overlap jingle AC — then the conditional slot (#20 vs #24, owner's pick). C1 (Oct 21 EOD): on track.
+
+## 2026-10-19 — Cycle #13 (issue #11, PR #26): synthesized audio + jingle lifecycle — last MUST of M2
+
+### What and why
+
+The §4 audio implementation as a framework-free service (`createAudioService` + pure event mapper), lazy AudioContext on first gesture, permanent no-op when WebAudio is unavailable, all notes scheduled up-front on the AudioContext clock with every OscillatorNode tracked — implementing the owner-relayed anti-overlap AC (2025 defect: game-over jingle overlapped the new game's sounds).
+
+### Outcome and independent verdicts
+
+[PR #26](https://github.com/lucapug/clown-circus-reloaded/pull/26) — 4 commits (28 audio tests + 2 shell start-path tests, 200 total), wiring confined to CircusGame.tsx (audio? injection seam), CI 6/6. Pre-verification catch: the engineer disclosed that the START button didn't start the ambient (brief enumerated only two entry points) — routed back immediately (rework loop 1, `ae0304f`: all three entry points share the start path, order pinned by test) BEFORE spending independent-verification cost. [QA VERDICT: PASS](https://github.com/lucapug/clown-circus-reloaded/pull/26#issuecomment-6273669237): timbre constants verified verbatim vs the baseline (incl. the 26-node Funeral March and the ambient reschedule), lifecycle traced (stopAll stops every tracked node; fresh 24 after), mapper covers all 8 event variants. [REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/26#issuecomment-6273659382) — zero findings above note; two owner-listening notes: the same-tick final-death truncation (the anti-overlap makes the final death silent vs 2025's overlap — PM-specified behavior, on the DoD-4 listening list) and the nodes-Set retention (bounded, minor memory). Merge pending the owner.
+
+### Measured ledger
+
+PM 413,098 · engineer 2,826,398 + 684,759 (rework) · QA 931,179 · reviewer 404,869 → **≈ 5.26M**, 156 tool uses. Stalls 0, escalations 0, 1 rework loop (pre-verification catch — the cheapest kind).
+
+### Lessons
+
+- The engineer's own deviation disclosure + the orchestrator's read-before-verify caught the START-button gap before QA: the cheapest rework is the one caught at the return-reading stage.
+- The anti-overlap AC inverted the 2025 defect into its mirror image (overlap → final-death silence): lifecycle fixes create their own audible artifacts — the owner's listening review is the real acceptance.
+
+### Next
+
+Owner reviews PR #26 (timbre + the two listening notes) and merges → **#11 closes, M2 5/6→ all 6 MUSTs done**; then the conditional slot (owner picks #20 entry-height or #24 streak — both specified), and C1 Oct 21 EOD. M3 (backend/DB/contract) is next after M2.
