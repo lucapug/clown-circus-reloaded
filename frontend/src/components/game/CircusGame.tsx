@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { createAudioEventMapper, createAudioService, type AudioService } from '../../game/audio';
 import { useGameLoop } from '../../game/useGameLoop';
 import type { GameLoopApi } from '../../game/useGameLoop';
 import {
@@ -13,32 +14,61 @@ import { GameOver } from './GameOver';
 import { StartScreen } from './StartScreen';
 
 // Testability seam (issue #9, decision 5; #10 swaps the stub for the real
-// factory): `loop` and `service` default to the real useGameLoop() and
-// createDefaultLeaderboardService(); flow tests inject fakes instead.
+// factory; #11 adds the audio service): `loop`, `service` and `audio` default
+// to the real useGameLoop(), createDefaultLeaderboardService() and
+// createAudioService(); flow tests inject fakes instead.
 export interface CircusGameProps {
   loop?: GameLoopApi;
   service?: LeaderboardService;
+  audio?: AudioService;
 }
 
 export const CircusGame = (props: CircusGameProps) => {
   // Hooks can't be conditional, so the injected-loop path renders a pure
   // inner component while the live path owns the real loop.
-  if (props.loop) return <CircusGameInner loop={props.loop} service={props.service} />;
-  return <CircusGameLive service={props.service} />;
+  if (props.loop) return <CircusGameInner loop={props.loop} service={props.service} audio={props.audio} />;
+  return <CircusGameLive service={props.service} audio={props.audio} />;
 };
 
-const CircusGameLive = ({ service }: { service?: LeaderboardService }) => {
-  const loop = useGameLoop();
-  return <CircusGameInner loop={loop} service={service} />;
+const CircusGameLive = ({
+  service,
+  audio: injectedAudio,
+}: {
+  service?: LeaderboardService;
+  audio?: AudioService;
+}) => {
+  // Live path only (#11 decision 6): the AudioContext is lazy — nothing is
+  // created until the first sound, which always descends from SPACE/click.
+  const [audio] = useState<AudioService>(() => injectedAudio ?? createAudioService());
+  const loop = useGameLoop({ onEvents: createAudioEventMapper(audio) });
+  return <CircusGameInner loop={loop} service={service} audio={audio} />;
 };
 
-const CircusGameInner = ({ loop, service }: { loop: GameLoopApi; service?: LeaderboardService }) => {
+const CircusGameInner = ({
+  loop,
+  service,
+  audio: injectedAudio,
+}: {
+  loop: GameLoopApi;
+  service?: LeaderboardService;
+  audio?: AudioService;
+}) => {
   const [leaderboardService] = useState<LeaderboardService>(() => service ?? createDefaultLeaderboardService());
+  const [audio] = useState<AudioService>(() => injectedAudio ?? createAudioService());
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [offline, setOffline] = useState(false);
   const [droppedCount, setDroppedCount] = useState(0);
   const { frame, start, queueInput } = loop;
   const phase = frame.state.phase;
+
+  // One shared start path for SPACE-at-idle and Play Again (#11 decision 2/6):
+  // silence anything in flight (a mid-flight game-over jingle), restart the
+  // loop, then bring the ambient pass back.
+  const startGame = useCallback(() => {
+    audio.stopAll();
+    start();
+    audio.startBackground();
+  }, [audio, start]);
 
   // #10: drain the offline queue BEFORE fetching, so the refreshed list
   // includes just-synced rows; drops are surfaced once via the sync notice.
@@ -91,14 +121,14 @@ const CircusGameInner = ({ loop, service }: { loop: GameLoopApi; service?: Leade
       if (e.code !== 'Space') return;
       e.preventDefault();
       if (phase === 'idle') {
-        start();
+        startGame();
       } else if (phase === 'playing') {
         queueInput({ type: 'launch' });
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [phase, start, queueInput]);
+  }, [phase, startGame, queueInput]);
 
   return (
     <div className="flex flex-col items-center gap-4 p-4 min-h-screen">
@@ -127,7 +157,7 @@ const CircusGameInner = ({ loop, service }: { loop: GameLoopApi; service?: Leade
         {phase === 'gameover' && (
           <GameOver
             score={frame.state.stats.score}
-            onRestart={() => start()}
+            onRestart={() => startGame()}
             onSaveScore={saveScore}
             leaderboard={leaderboard}
           />
