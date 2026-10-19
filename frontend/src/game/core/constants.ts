@@ -1,4 +1,4 @@
-// Single source of truth for every pinned §3.1/§3.4 value (2025 lesson: the
+// Single source of truth for every pinned §3.1/§3.2/§3.4/§3.5 value (2025 lesson: the
 // baseline duplicated these constants across engine and types, and the tested
 // copy drifted). All values are per logic tick; one tick is exactly 1/60 s
 // (owner decision, 2026-10-15 — an explicit, recorded deviation from the 2025
@@ -89,3 +89,20 @@ export const BALLOON_GRID_X_STEP = (BALLOON_GRID_X_END - BALLOON_GRID_X_START) /
 // Row colors top→bottom. BalloonColor is derived so this stays the only place
 // the mapping exists.
 export const BALLOON_ROW_COLORS = ['blue', 'green', 'green', 'yellow'] as const;
+
+// Scoring, bonus jumps and lives (spec §3.2/§3.5, issue #7). Consumed only by
+// scoring.ts/consequences.ts; the kernel stays free of pinned score values.
+export const BALLOON_SCORES: Record<(typeof BALLOON_ROW_COLORS)[number], number> = {
+  yellow: 20,
+  green: 50,
+  blue: 100,
+};
+export const ROW_BONUS_POINTS: Record<(typeof BALLOON_ROW_COLORS)[number], number> = {
+  yellow: 200,
+  green: 500,
+  blue: 1000,
+};
+export const EDGE_LANDING_BONUS = 10; // "Bounce (land on seesaw edge)", §3.2
+export const BONUS_JUMPS_FOR_BLUE_ROW = 1; // §3.3 EARNING only; spending is #8
+export const LIVES_ON_LEVEL_UP = 1; // §3.5
+export const LIVES_ON_DEATH = 1; // §3.5
