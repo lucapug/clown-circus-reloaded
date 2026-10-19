@@ -13,6 +13,7 @@ import type {
   SubmitScoreOutcome,
 } from '../../../services/leaderboard';
 import { CircusGame } from '../CircusGame';
+import type { AudioService } from '../../../game/audio';
 
 afterEach(cleanup);
 
@@ -30,6 +31,27 @@ const fakeLoop = (phase: GamePhase = 'idle'): GameLoopApi => ({
 });
 
 const live = (entries: LeaderboardEntry[]): LeaderboardSnapshot => ({ entries, source: 'live' });
+
+interface FakeAudio extends AudioService {
+  pop: ReturnType<typeof vi.fn>;
+  bonus: ReturnType<typeof vi.fn>;
+  death: ReturnType<typeof vi.fn>;
+  bounce: ReturnType<typeof vi.fn>;
+  gameOverJingle: ReturnType<typeof vi.fn>;
+  startBackground: ReturnType<typeof vi.fn>;
+  stopAll: ReturnType<typeof vi.fn>;
+}
+
+/** Audio mock over the #11 injection seam (same pattern as the loop/service fakes). */
+const fakeAudio = (): FakeAudio => ({
+  pop: vi.fn(),
+  bonus: vi.fn(),
+  death: vi.fn(),
+  bounce: vi.fn(),
+  gameOverJingle: vi.fn(),
+  startBackground: vi.fn(),
+  stopAll: vi.fn(),
+});
 
 interface FakeService extends LeaderboardService {
   fetchLeaderboard: ReturnType<typeof vi.fn>;
@@ -129,6 +151,49 @@ describe('CircusGame flows with an injected fake loop (issue #9 DoD d)', () => {
     render(<CircusGame loop={loop} service={noopService()} />);
     fireEvent.click(screen.getByTestId('play-again'));
     expect(loop.start).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('CircusGame audio start path (issue #11 DoD 2 — jingle stops when a new game starts)', () => {
+  it('Play Again runs audio.stopAll → loop.start → audio.startBackground, in that order', () => {
+    const loop = fakeLoop('gameover');
+    const audio = fakeAudio();
+    render(<CircusGame loop={loop} service={noopService()} audio={audio} />);
+    fireEvent.click(screen.getByTestId('play-again'));
+    expect(audio.stopAll).toHaveBeenCalledTimes(1);
+    expect(audio.startBackground).toHaveBeenCalledTimes(1);
+    expect(loop.start).toHaveBeenCalledTimes(1);
+    const stopOrder = audio.stopAll.mock.invocationCallOrder[0];
+    const startOrder = vi.mocked(loop.start).mock.invocationCallOrder[0];
+    const bgOrder = audio.startBackground.mock.invocationCallOrder[0];
+    expect(stopOrder).toBeLessThan(startOrder);
+    expect(startOrder).toBeLessThan(bgOrder);
+  });
+
+  it('SPACE while idle runs the same audio start sequence (stopAll before startBackground)', () => {
+    const loop = fakeLoop('idle');
+    const audio = fakeAudio();
+    render(<CircusGame loop={loop} service={noopService()} audio={audio} />);
+    fireEvent.keyDown(window, { code: 'Space' });
+    expect(audio.stopAll).toHaveBeenCalledTimes(1);
+    expect(audio.startBackground).toHaveBeenCalledTimes(1);
+    expect(loop.start).toHaveBeenCalledTimes(1);
+    expect(audio.stopAll.mock.invocationCallOrder[0]).toBeLessThan(audio.startBackground.mock.invocationCallOrder[0]);
+  });
+
+  it('the START GAME button runs the same audio start sequence (rework loop 1)', () => {
+    const loop = fakeLoop('idle');
+    const audio = fakeAudio();
+    render(<CircusGame loop={loop} service={noopService()} audio={audio} />);
+    fireEvent.click(screen.getByRole('button', { name: 'START GAME' }));
+    expect(audio.stopAll).toHaveBeenCalledTimes(1);
+    expect(audio.startBackground).toHaveBeenCalledTimes(1);
+    expect(loop.start).toHaveBeenCalledTimes(1);
+    const stopOrder = audio.stopAll.mock.invocationCallOrder[0];
+    const startOrder = vi.mocked(loop.start).mock.invocationCallOrder[0];
+    const bgOrder = audio.startBackground.mock.invocationCallOrder[0];
+    expect(stopOrder).toBeLessThan(startOrder);
+    expect(startOrder).toBeLessThan(bgOrder);
   });
 });
 
