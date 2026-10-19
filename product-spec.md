@@ -17,7 +17,7 @@ A browser remake of the arcade games *Circus* (Exidy, 1977) and *Clowns* (Midway
 
 ### 2.1 Start screen (pre-game overlay)
 
-- Title "CIRCUS", tagline area, "Clear row = Bonus!" hint, START button; top-3 leaderboard shown when non-empty. Starting: click START or press SPACE.
+- Title "CIRCUS", tagline area, mechanic hint (2026: `25 launches without a crash = +1 Jump · A Jump absorbs one crash`; 2025 original was "Clear row = Bonus!"), START button; top-3 leaderboard shown when non-empty. Starting: click START or press SPACE.
 - Evidence: `frontend/src/components/game/StartScreen.tsx@0d365e6`, `CircusGame.tsx` key handler.
 
 ### 2.2 Gameplay
@@ -76,13 +76,14 @@ Row clear = all 14 balloons of that row popped (checked when any balloon pops). 
 
 **[2025 evidence + 2026 requirement]** In the baseline, the tested pure module `utils/scoring.ts` was **never imported by the engine** — only by its own test file; the engine reimplemented the logic inline (`useGameEngine.ts:135–151`) with duplicated constants from `types/game.ts`. Tests could stay green while the live copy drifted. In 2026 the pure scoring module is the *only* implementation, consumed by the engine (single source of truth), and **tests must cover the live path** — asserting scoring outcomes through the core's consumption of the module (pop → row-clear → score / bonus-jump state), not only via direct calls to the standalone module.
 
-### 3.3 `bonusJumps` — earning (2025 behavior, kept) and consumption (**2026 design decision, option A**)
+### 3.3 `bonusJumps` — earning (**2026 design decision v2, owner 2026-10-19**) and consumption (**2026 design decision, option A**)
 
-- **Earning [2025 evidence]:** clearing the **blue row** (only) grants +1 bonus jump; the HUD displays the counter under the label "Jumps" (`scoring.ts:getExtraJumpsForRowClear`, `useGameEngine.ts:382`, `GameHUD.tsx`).
+- **Earning [2026 design decision — approved by owner 2026-10-19; REPLACES the 2025 blue-row earning, which shipped in #7 and is removed by the streak cycle]:** every **25 consecutive launch cycles without a death** grants +1 bonus jump. A *launch cycle* = a safe edge landing on the seesaw (which chain-launches the other seated clown); launches from the diving board do NOT count toward the streak; a **death resets the streak to 0** (in addition to the §3.3 consumption/death rules). The threshold (25) is a **calibration parameter** — to be tuned with real observability data (games played, jumps earned, max streak per game) once M5 telemetry is live; it lives in `constants.ts` like every other pinned value. The blue row keeps its **1000-point row bonus only** (no jump).
+- **HUD & splash comprehensibility (splash lesson, owner 2026-10-19):** the HUD shows the Jumps counter (always visible) **plus the streak progress toward the threshold** (e.g. `Streak: 12/25`) — a reward the player cannot see accumulating is indistinguishable from randomness. The start screen states the mechanic in one line (replaces the blue-row hint): `25 launches without a crash = +1 Jump · A Jump absorbs one crash`.
 - **Consumption [2026 design decision — approved by owner 2026-10-15; *not* inferred 2025 intent]:** forensics found no consumption logic ever existed in the 2025 baseline (§10), so spending semantics are a new design decision. **Option A: when a death would occur and `bonusJumps > 0`, one bonus jump is consumed instead of one life.** The death sequence itself is otherwise unchanged — the clown still resets to a diving board, jump velocity still resets to −14, and the death sound/"SPLAT!" feedback still play.
-- Alternatives considered and rejected: removing the stat (loses the advertised mechanic); free relaunch (changes core-loop pacing — larger design surface under deadline).
+- Alternatives considered and rejected: removing the stat (loses the advertised mechanic); free relaunch (changes core-loop pacing); keeping blue-row earning alongside the streak (double economy — the confusion the start-screen hint exists to prevent); threshold 100 (≈ 7–10 deathless levels: would practically never fire — the 2025 dead-stat disease).
 
-**Acceptance criteria:** [ ] A death with `bonusJumps > 0` decrements `bonusJumps`, not lives; all other death-reset rules still apply. [ ] A death with `bonusJumps = 0` decrements lives exactly as in 2025. [ ] The dead-end state (counter increments, nothing consumes it) cannot occur — guarded by tests covering the live path.
+**Acceptance criteria:** [ ] A death with `bonusJumps > 0` decrements `bonusJumps`, not lives; all other death-reset rules still apply. [ ] A death with `bonusJumps = 0` decrements lives exactly as in 2025. [ ] Every safe edge landing increments the streak; every death resets it to 0; diving-board launches do not increment it. [ ] Reaching 25 grants +1 bonus jump and resets the streak counter to 0 (the jump counter itself just accrues). [ ] The dead-end state (counter increments, nothing consumes it) cannot occur — guarded by live-path tests. [ ] HUD shows streak progress; start screen states the mechanic.
 
 ### 3.4 Clown lifecycle and physics
 
