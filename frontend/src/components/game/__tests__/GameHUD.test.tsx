@@ -18,17 +18,32 @@ describe('GameHUD (issue #9 DoD a)', () => {
     expect(screen.getByTestId('hud-jumps')).toHaveTextContent('0');
   });
 
-  it('renders exactly 3 life pips with filled = min(lives, 3)', () => {
+  it('renders at least 3 pips with filled = lives when below 3', () => {
     render(<GameHUD score={0} lives={2} bonusJumps={4} />);
     const pips = screen.getAllByTestId('life-pip');
     expect(pips).toHaveLength(3);
     expect(pips.filter((pip) => pip.dataset.filled === 'true')).toHaveLength(2);
   });
 
-  it('caps filled pips at 3 when lives exceed 3 (level-up lives)', () => {
+  it('renders exactly 3 pips, all filled, at 3 lives', () => {
+    render(<GameHUD score={0} lives={3} bonusJumps={0} />);
+    const pips = screen.getAllByTestId('life-pip');
+    expect(pips).toHaveLength(3);
+    expect(pips.filter((pip) => pip.dataset.filled === 'true')).toHaveLength(3);
+  });
+
+  it('shows a 4th filled pip when a 4th life is earned (dynamic pips)', () => {
+    render(<GameHUD score={0} lives={4} bonusJumps={0} />);
+    const pips = screen.getAllByTestId('life-pip');
+    expect(pips).toHaveLength(4);
+    expect(pips.filter((pip) => pip.dataset.filled === 'true')).toHaveLength(4);
+  });
+
+  it('renders one pip per life beyond 3 (5 lives → 5 filled pips)', () => {
     render(<GameHUD score={0} lives={5} bonusJumps={0} />);
     const pips = screen.getAllByTestId('life-pip');
-    expect(pips.filter((pip) => pip.dataset.filled === 'true')).toHaveLength(3);
+    expect(pips).toHaveLength(5);
+    expect(pips.filter((pip) => pip.dataset.filled === 'true')).toHaveLength(5);
   });
 
   it('renders zero filled pips at 0 lives', () => {

@@ -6,8 +6,9 @@ interface GameHUDProps {
 
 // Baseline GameHUD layout, with the owner-decided #9 behavior: the "Jumps"
 // counter is ALWAYS visible (rendered even at 0) and now moves for real —
-// it decrements when a jump is consumed (spec §3.3). Exactly 3 life pips,
-// filled = min(lives, 3).
+// it decrements when a jump is consumed (spec §3.3). Life pips are derived
+// from `lives` — Math.max(3, lives) — so a 4th life earned at 3 is visible
+// (2026 improvement: the baseline hardcoded 3 pips and hid extra lives).
 export const GameHUD = ({ score, lives, bonusJumps }: GameHUDProps) => {
   return (
     <div className="flex justify-between items-center w-full max-w-[800px] px-4 py-2 bg-card rounded-lg arcade-border">
@@ -29,7 +30,7 @@ export const GameHUD = ({ score, lives, bonusJumps }: GameHUDProps) => {
 
       <div className="flex items-center gap-2">
         <span className="text-xs text-muted-foreground uppercase tracking-wider mr-2">Lives</span>
-        {Array.from({ length: 3 }).map((_, i) => (
+        {Array.from({ length: Math.max(3, lives) }).map((_, i) => (
           <div
             key={i}
             data-testid="life-pip"
