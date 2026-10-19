@@ -10,8 +10,8 @@ const coreSources: Record<string, string> = Object.fromEntries(
   ).filter(([path]) => !path.includes('__tests__') && !/\.test\.ts$/.test(path)),
 );
 
-// The core module set from the issue #6 file tree.
-const CORE_MODULES = ['constants', 'rng', 'types', 'state', 'engine', 'events', 'index'];
+// The core module set: the issue #6 file tree plus #7's scoring/consequences.
+const CORE_MODULES = ['constants', 'rng', 'types', 'state', 'engine', 'events', 'index', 'scoring', 'consequences'];
 
 const FORBIDDEN_PATTERNS: ReadonlyArray<[RegExp, string]> = [
   [/\breact\b/i, 'React import or reference'],
