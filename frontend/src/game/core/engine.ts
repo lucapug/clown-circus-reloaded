@@ -342,13 +342,19 @@ export interface AdvanceResult extends StepResult {
  * floor(accumulator / TICK_DURATION) logic ticks, carry the remainder. At
  * most MAX_TICKS_PER_ADVANCE ticks per call; excess time is discarded
  * (spiral-of-death guard — a 2026 implementation choice, not product scope).
- * The rAF wiring consuming this belongs to #9.
+ *
+ * `inputs` (issue #9, decision 2) is the rAF driver's queue, drained by the
+ * FIRST executed step of the tick loop only — spec §6.2's "consumed at tick
+ * boundaries". A zero-tick frame consumes nothing, so the caller resubmits.
+ * Optional with default [], so every pre-existing caller (golden and
+ * reproducibility suites included) is byte-for-byte unaffected.
  */
 export function advance(
   sim: Simulation,
   dtSeconds: number,
   rng: Rng,
   consequences?: ConsequenceReducer,
+  inputs: readonly GameInput[] = [],
 ): AdvanceResult {
   sim.accumulator += dtSeconds;
   const pending = Math.floor(sim.accumulator / TICK_DURATION);
@@ -358,7 +364,7 @@ export function advance(
 
   const events: GameEvent[] = [];
   for (let i = 0; i < ticks; i++) {
-    const result = step(sim.state, [], rng, consequences);
+    const result = step(sim.state, i === 0 ? inputs : [], rng, consequences);
     sim.state = result.state;
     events.push(...result.events);
   }
