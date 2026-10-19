@@ -123,6 +123,26 @@ describe('submitScore classification (write-behind: enqueue happens before the P
     expect(outcome).toMatchObject({ status: 'queued' });
     expect(readPendingScores()).toHaveLength(1);
   });
+
+  it('a storage throw during enqueue is guarded: defined outcome, no unhandled rejection, queue consistent', async () => {
+    // Reviewer finding (PR #25, comment 6272623636): quota-exceeded/private-
+    // mode setItem used to escape submitScore as an unhandled rejection.
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('QuotaExceededError');
+    });
+    try {
+      const service = createHttpLeaderboardService({
+        fetchImpl: vi.fn(async () => {
+          throw new TypeError('Failed to fetch');
+        }),
+      });
+      // A typed outcome must resolve (not reject) even with storage broken.
+      await expect(service.submitScore('Ada', 5)).resolves.toMatchObject({ status: 'queued' });
+      expect(readPendingScores()).toEqual([]); // nothing persisted, no crash
+    } finally {
+      setItem.mockRestore();
+    }
+  });
 });
 
 describe('case 1 — lost response, reload, healthy drain: exactly one row (§8.2, unit level)', () => {

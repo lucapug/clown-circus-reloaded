@@ -85,15 +85,32 @@ export const createHttpLeaderboardService = (opts: HttpLeaderboardOptions = {}):
     // crash/lost response still leaves the entry safe; a definitive result
     // removes it.
     const submissionId = newSubmissionId();
-    enqueuePendingScore({ submissionId, name, score, queuedAt: Date.now() });
+    // Storage itself can fail (quota exceeded, private mode). Each storage
+    // call is guarded: if the enqueue throws we still POST and let the POST
+    // result decide — worst case the score saves without queue persistence,
+    // which is honest (the player sees the true outcome, never a silent
+    // unhandled rejection).
+    try {
+      enqueuePendingScore({ submissionId, name, score, queuedAt: Date.now() });
+    } catch {
+      // storage unavailable: continue unqueued
+    }
     try {
       const res = await postScore(name, score, submissionId);
       if (res.ok) {
-        removePendingScore(submissionId);
+        try {
+          removePendingScore(submissionId);
+        } catch {
+          // best-effort cleanup; the save itself succeeded
+        }
         return { status: 'saved', submissionId };
       }
       if (isDefinitive4xx(res.status)) {
-        removePendingScore(submissionId);
+        try {
+          removePendingScore(submissionId);
+        } catch {
+          // best-effort cleanup; the rejection itself is definitive
+        }
         return classify4xx(res.status);
       }
       return { status: 'queued', submissionId }; // 5xx: not definitive, stays queued
