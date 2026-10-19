@@ -173,3 +173,75 @@ describe('live-path scoring through step/advance (spec §3.2–§3.3)', () => {
     expect(state.phase).toBe('playing'); // 2 lives left: no game-over
   });
 });
+
+// Issue #7 AC-5: the spec §3.5 scripted scenario, headless and deterministic
+// (seeded RNG), entirely through step() with createConsequences(). The §3.5
+// start state (3 lives, level 1, score 0, phase 'playing') is the ONLY
+// constructed stats write; afterwards stats and level flow from step result
+// to step result — each segment's state is a spread of the previous one with
+// only the clowns replaced (kernel purity, tick-order precedent).
+describe('spec §3.5 scripted end-to-end scenario (headless)', () => {
+  it('levels up at 3 lives (+1), then four deaths end the game with game-over emitted last', () => {
+    const rng = createRng(2026);
+    const run = (state: GameState) => step(state, [], rng, consequences);
+
+    // §3.5 start state.
+    const start = playing(); // 3 lives, level 1, score 0, bonusJumps 0
+
+    // (i) 55/56 pre-popped; the LAST blue balloon sits on the flying clown's
+    // post-integration position (construction of the tick-order level probe):
+    // one tick = pop + blue row clear + level-completed + edge landing +
+    // chain launch. Score earns pop and row bonus; a life is gained.
+    const i = run({
+      ...start,
+      balloons: gridWithLastAt('0-0', 440, LANDING_Y + GRAVITY),
+      clowns: [flying(440, LANDING_Y, 0, 0), seatedLeft(370)],
+    });
+    expect(eventTypes(i.events)).toEqual(['balloon-popped', 'row-cleared', 'level-completed', 'landed-edge', 'launched']);
+    expect(i.state.stats.score).toBe(getBalloonScore('blue') + getRowBonus('blue') + 10); // 1110
+    expect(i.state.stats.bonusJumps).toBe(1); // blue row clear earned it
+    expect(i.state.stats.lives).toBe(4); // 3 + 1
+    expect(i.state.level).toBe(2);
+    expect(i.state.balloons).toHaveLength(56);
+    expect(i.state.balloons.every((b) => !b.popped)).toBe(true);
+    expect(i.state.phase).toBe('playing');
+
+    // (ii) four death segments — middle, occupied-edge, fall-off, middle
+    // again — carrying score/bonusJumps/level forward through real steps.
+    // Balloons (fresh grid, y ≤ 180) are never near the constructed descent
+    // paths, so no pops interfere.
+
+    // Segment 1: middle third under the default seesaw (x = 400).
+    const d1 = run({ ...i.state, clowns: [flying(400, LANDING_Y, 0, 0), seatedLeft(370)] });
+    expect(eventTypes(d1.events)).toEqual(['death']);
+    expect(d1.state.stats.lives).toBe(3); // 4 − 1
+    expect(d1.state.currentJumpVelocity).toBe(INITIAL_JUMP_VELOCITY); // reset from −14.2
+
+    // Segment 2: left edge occupied by the seated clown.
+    const d2 = run({ ...d1.state, clowns: [seatedLeft(370), flying(380, LANDING_Y, 0, 0)] });
+    expect(eventTypes(d2.events)).toEqual(['death']);
+    expect(d2.events[0].type === 'death' && d2.events[0].cause).toBe('occupied-edge');
+    expect(d2.state.stats.lives).toBe(2);
+    expect(d2.state.currentJumpVelocity).toBe(INITIAL_JUMP_VELOCITY);
+
+    // Segment 3: fall-off past the death line (x = 200 misses the seesaw).
+    const d3 = run({ ...d2.state, clowns: [seatedLeft(370), flying(200, 650, 0, 0)] });
+    expect(eventTypes(d3.events)).toEqual(['death']);
+    expect(d3.events[0].type === 'death' && d3.events[0].cause).toBe('fall-off');
+    expect(d3.state.stats.lives).toBe(1);
+    expect(d3.state.currentJumpVelocity).toBe(INITIAL_JUMP_VELOCITY);
+
+    // (iii) Final tick: the fourth death reaches 0 lives and the kernel's
+    // once-guard transitions the phase with 'game-over' emitted LAST.
+    const d4 = run({ ...d3.state, clowns: [flying(400, LANDING_Y, 0, 0), seatedLeft(370)] });
+    expect(eventTypes(d4.events)).toEqual(['death', 'game-over']); // game-over last in the tick
+    expect(d4.events[0].type === 'death' && d4.events[0].cause).toBe('middle');
+    expect(d4.state.stats.lives).toBe(0);
+    expect(d4.state.phase).toBe('gameover');
+    // Carried untouched through all four deaths: score, earned bonusJumps
+    // (consumption is #8) and the level from segment (i).
+    expect(d4.state.stats.score).toBe(getBalloonScore('blue') + getRowBonus('blue') + 10);
+    expect(d4.state.stats.bonusJumps).toBe(1);
+    expect(d4.state.level).toBe(2);
+  });
+});
