@@ -48,3 +48,22 @@ describe('StartScreen (issue #9 DoD b)', () => {
     expect(onStart).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('StartScreen offline indicator (issue #10, the one sanctioned line)', () => {
+  it('shows the badge beside HIGH SCORES when offline with cached entries', () => {
+    render(<StartScreen onStart={vi.fn()} leaderboard={entries(5)} offline />);
+    expect(screen.getByTestId('offline-indicator')).toHaveTextContent('Offline — showing saved scores');
+    expect(screen.getByTestId('high-scores')).toBeInTheDocument();
+  });
+
+  it('renders no badge when online', () => {
+    render(<StartScreen onStart={vi.fn()} leaderboard={entries(5)} />);
+    expect(screen.queryByTestId('offline-indicator')).not.toBeInTheDocument();
+  });
+
+  it('offline-and-empty keeps the hidden HIGH SCORES block (no badge anywhere)', () => {
+    render(<StartScreen onStart={vi.fn()} leaderboard={[]} offline />);
+    expect(screen.queryByTestId('high-scores')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('offline-indicator')).not.toBeInTheDocument();
+  });
+});

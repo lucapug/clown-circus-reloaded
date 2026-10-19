@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { LeaderboardEntry } from '../../../services/leaderboard';
+import type { LeaderboardEntry, SubmitScoreOutcome } from '../../../services/leaderboard';
 import { GameOver } from '../GameOver';
 
 afterEach(cleanup);
@@ -15,12 +15,18 @@ const renderGameOver = (overrides: Partial<Parameters<typeof GameOver>[0]> = {})
   const props = {
     score: 1234,
     onRestart: vi.fn(),
-    onSaveScore: vi.fn(async () => {}),
+    // #10: fakes return outcomes — the default resolves as saved.
+    onSaveScore: vi.fn(async (): Promise<SubmitScoreOutcome> => ({ status: 'saved', submissionId: 'sub-1' })),
     leaderboard: [] as LeaderboardEntry[],
     ...overrides,
   };
   render(<GameOver {...props} />);
   return props;
+};
+
+const typeNameAndSave = async (name = 'Ada') => {
+  await userEvent.type(screen.getByTestId('player-name'), name);
+  await userEvent.click(screen.getByTestId('save-score'));
 };
 
 describe('GameOver (issue #9 DoD c)', () => {
@@ -48,8 +54,7 @@ describe('GameOver (issue #9 DoD c)', () => {
 
   it('saves the TRIMMED name and shows Score Saved!', async () => {
     const props = renderGameOver();
-    await userEvent.type(screen.getByTestId('player-name'), '  Ada  ');
-    await userEvent.click(screen.getByTestId('save-score'));
+    await typeNameAndSave('  Ada  ');
     expect(props.onSaveScore).toHaveBeenCalledWith('Ada', 1234);
     expect(await screen.findByText('Score Saved!')).toBeInTheDocument();
   });
@@ -71,5 +76,61 @@ describe('GameOver (issue #9 DoD c)', () => {
     const props = renderGameOver();
     fireEvent.click(screen.getByTestId('play-again'));
     expect(props.onRestart).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('GameOver honest save states (issue #10, the #23 fix)', () => {
+  it('shows the offline-queued message, never "Saved"', async () => {
+    renderGameOver({ onSaveScore: vi.fn(async (): Promise<SubmitScoreOutcome> => ({ status: 'queued', submissionId: 'sub-1' })) });
+    await typeNameAndSave();
+    expect(await screen.findByTestId('save-queued')).toHaveTextContent('Saved offline — will sync');
+    expect(screen.queryByText('Score Saved!')).not.toBeInTheDocument();
+  });
+
+  it('shows the validation rejection message on 422', async () => {
+    renderGameOver({
+      onSaveScore: vi.fn(async (): Promise<SubmitScoreOutcome> => ({ status: 'rejected', reason: 'validation', httpStatus: 422 })),
+    });
+    await typeNameAndSave();
+    expect(await screen.findByTestId('save-rejected')).toHaveTextContent('Could not save: invalid name or score');
+    expect(screen.queryByText('Score Saved!')).not.toBeInTheDocument();
+  });
+
+  it('shows the conflict rejection message on 409', async () => {
+    renderGameOver({
+      onSaveScore: vi.fn(async (): Promise<SubmitScoreOutcome> => ({ status: 'rejected', reason: 'conflict', httpStatus: 409 })),
+    });
+    await typeNameAndSave();
+    expect(await screen.findByTestId('save-rejected')).toHaveTextContent('Could not save: sync conflict');
+  });
+
+  it('shows the generic rejection message for any other definitive 4xx', async () => {
+    renderGameOver({
+      onSaveScore: vi.fn(async (): Promise<SubmitScoreOutcome> => ({ status: 'rejected', reason: 'other', httpStatus: 400 })),
+    });
+    await typeNameAndSave();
+    expect(await screen.findByTestId('save-rejected')).toHaveTextContent('Could not save: request rejected');
+  });
+
+  it('disables the button with "Saving…" while the save is in flight (no double-click double-row)', async () => {
+    let resolve!: (outcome: SubmitScoreOutcome) => void;
+    const onSaveScore = vi.fn(
+      () =>
+        new Promise<SubmitScoreOutcome>((res) => {
+          resolve = res;
+        }),
+    );
+    renderGameOver({ onSaveScore });
+
+    await typeNameAndSave();
+    const save = screen.getByTestId('save-score');
+    expect(save).toBeDisabled();
+    expect(save).toHaveTextContent('Saving…');
+    // A second click while in flight must not reach the service again.
+    await userEvent.click(save).catch(() => {});
+    expect(onSaveScore).toHaveBeenCalledTimes(1);
+
+    resolve({ status: 'saved', submissionId: 'sub-1' });
+    expect(await screen.findByText('Score Saved!')).toBeInTheDocument();
   });
 });
