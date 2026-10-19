@@ -19,7 +19,7 @@ graph TD
         I7["#7 Scoring module + lives/levels ✅ merged"]
         I8["#8 Progression + bonusJumps (2026 dec. A) ✅ merged"]
         I9["#9 Canvas shell, HUD, screens ✅ merged"]
-        I10["#10 Services + mocks + offline queue"]
+        I10["#10 Services + mocks + offline queue ✅ merged"]
         I11["#11 Synthesized audio"]
         I19["#19 Free-side unification ✅ merged"]
         I20["#20 Entry-height randomization (level 4, 50/50) — CONDITIONAL"]
