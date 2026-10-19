@@ -438,3 +438,26 @@ B → issue #19 (side-derivation unification, after #8); C → log-only (questio
 ### Next
 
 Owner merges PR #21 (#8 closes; M2 at 3/6). Then #19 (small, side unification) and #9 (shell/screens/E2E hooks — the big one; carries the #9 relays above). C1 (Oct 21): on track.
+
+## 2026-10-19 — Cycle #10 (issue #19, PR #22): free-side unification — zero rework, byte-gate methodology validated
+
+### What and why
+
+Owner decision B implemented: all three death causes enter on the free seesaw end derived from the currently seated clown (receiver's perspective); 'right' fallback when none seated; height decision point untouched. Restores full §3.4 conformance and resolves the PR-17 reviewer's divergence finding.
+
+### Outcome and independent verdicts
+
+[PR #22](https://github.com/lucapug/clown-circus-reloaded/pull/22) — 3 commits (red tests → green engine → 3 fixtures regenerated), 5 files. [QA VERDICT: PASS](https://github.com/lucapug/clown-circus-reloaded/pull/22#issuecomment-6266575151): discriminating tests verified to fail under the old derivation; byte-gate independently confirmed (only b-chain/c-middle/c-occupied-edge changed; b-chain only at snapshot 300); kernel hygiene (seam, fold order, height constant untouched). [REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/22#issuecomment-6266535322) — zero findings above note; confirms #20 composes cleanly with the single derivation point. Merge pending the owner.
+
+### Measured ledger
+
+PM 860,581 (included a /tmp byte-gate probe that predicted the divergent fixtures before implementation — the probe became the QA verification target) · engineer 1,895,405 · QA 741,586 · reviewer 218,198 → **≈ 3.72M**, 116 tool uses. Stalls 0, escalations 0, rework 0.
+
+### Lessons
+
+- The PM's pre-implementation probe (byte-gate predictions) doubled as the acceptance oracle: QA verified the predictions, not just the outcome — methodology worth reusing for fixture-touching cycles.
+- Diary-pass convention (owner-approved): this entry is the first written once, at cycle close-out, from `main` — the branch-switching incident class ends here.
+
+### Next
+
+Owner merges PR #22 (#19 closes; M2 at 4/6). Then **#9 (shell/screens/E2E hooks — the big one**, carrying the relays: death feedback keyed on the event even when jump-absorbed; HUD "Jumps" visibility design call), **#10 services/offline**, **#11 audio**, then the conditional **#20** (only if on schedule). C1 (Oct 21 EOD): on track.
