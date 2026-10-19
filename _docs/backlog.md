@@ -18,7 +18,7 @@ graph TD
         I6["#6 Deterministic core: ticks, RNG, physics ✅ merged"]
         I7["#7 Scoring module + lives/levels ✅ merged"]
         I8["#8 Progression + bonusJumps (2026 dec. A) ✅ merged"]
-        I9["#9 Canvas shell, HUD, screens"]
+        I9["#9 Canvas shell, HUD, screens ✅ merged"]
         I10["#10 Services + mocks + offline queue"]
         I11["#11 Synthesized audio"]
         I19["#19 Free-side unification ✅ merged"]
