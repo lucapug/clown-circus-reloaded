@@ -506,3 +506,27 @@ Threshold **25** (calibration parameter, lives in constants.ts, tune via M5 data
 ### Next
 
 Owner merges PR #23 (after their side-by-side re-play) → #9 closes, M2 4/6. Then #10 → #11 → the conditional slot (owner picks #20 or #24). C1 Oct 21 EOD.
+
+## 2026-10-19 — Cycle #12 (issue #10, PR #25): services layer + offline idempotent queue
+
+### What and why
+
+The §8 offline-resilience implementation: `SubmitScoreOutcome` typed service boundary (saved / queued / rejected — the honest-UI fix for the #23 relay), write-behind queue (enqueue BEFORE the POST — the crash-safe structure), FIFO drain re-using stored submissionIds (the §7 idempotency client side), localStorage cache with `source: live|cached`, mock mode for zero-backend development, and the UI honest states ("Saved offline — will sync"; never "Saved" on 4xx).
+
+### Outcome and independent verdicts
+
+[PR #25](https://github.com/lucapug/clown-circus-reloaded/pull/25) — 5 commits, 16 files, 169 tests. CI 6/6. [QA VERDICT: PASS](https://github.com/lucapug/clown-circus-reloaded/pull/25#issuecomment-6272744874): the brief's 7 case groups re-run (incl. the lost-response exactly-one-row at unit level: stub records the POST then throws; healthy reload drain syncs exactly once), browser DoD 4/5 from live (offline save → queued exactly once across reload). [REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/25#issuecomment-6272623636) after one [minor] rework loop: `enqueuePendingScore` outside the try (storage throw → unhandled rejection) → **mini-agent trial #3** (`2a309ed`: every storage call individually guarded; enqueue-throw semantics = POST still runs and its result decides — worst case saved without queue persistence, never an unhandled rejection; new test with mocked Storage throw) → [REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/25#issuecomment-6272862353). The live lost-response integration run stays explicitly not claimable until M3/M4 (stated in the PR).
+
+### Measured ledger
+
+PM 365,783 · engineer 6,067,368 · QA 2,522,196 · reviewer 463,026 · mini-agent 1,016,335 · reviewer close-out 306,379 → **≈ 10.74M**, 271 tool uses. Stalls 0, escalations 0, 1 rework loop (mini-agent trial #3).
+
+### Lessons
+
+- **Mini-agent cost variance is high**: trial #3 cost 1.02M for a one-line guard + test (vs 253k for trial #1) — the resumed-context baseline of these agents is not tiny. The P1.4 consolidation decision (post-M2) should weigh both the wins and this variance; a fixed-context micro-fixer might beat resume-style agents even at this scope.
+- Queue logic is where state machines hide: the reviewer's §8.2-epistemics check (queued = "server state genuinely unknown", a truthful classification even when the enqueue failed) is exactly the kind of finding the independent pass exists for.
+- Second-largest cycle in the project — UI/storage cycles are intrinsically expensive; the remaining M2 surface (#11 audio) is smaller.
+
+### Next
+
+Owner merges PR #25 (#10 closes; M2 5/6). Then **#11 (audio)** — last MUST of M2, carrying the new anti-overlap jingle AC — then the conditional slot (#20 vs #24, owner's pick). C1 (Oct 21 EOD): on track.
