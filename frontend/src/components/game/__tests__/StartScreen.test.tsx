@@ -22,6 +22,7 @@ describe('StartScreen (issue #9 DoD b)', () => {
     expect(screen.getByText('Green: 50 pts')).toBeInTheDocument();
     expect(screen.getByText('Blue: 100 pts')).toBeInTheDocument();
     expect(screen.getByText('Clear row = Bonus!')).toBeInTheDocument();
+    expect(screen.getByText('Clear the blue row = +1 Jump · A Jump absorbs one crash')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'START GAME' })).toBeInTheDocument();
     expect(screen.getByText('Click or press SPACE to begin')).toBeInTheDocument();
   });

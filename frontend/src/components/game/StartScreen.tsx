@@ -108,6 +108,10 @@ export const StartScreen = ({ onStart, leaderboard }: StartScreenProps) => {
                 <span className="text-primary text-lg">★</span>
                 <span className="text-muted-foreground">Clear row = Bonus!</span>
               </div>
+              {/* Player-facing doc of the §3.3 mechanic (owner request, rework loop 2): blue rows earn a Jump; a Jump absorbs one crash. */}
+              <div className="col-span-2 text-muted-foreground mt-1">
+                Clear the blue row = +1 Jump · A Jump absorbs one crash
+              </div>
             </div>
           </div>
         </div>
