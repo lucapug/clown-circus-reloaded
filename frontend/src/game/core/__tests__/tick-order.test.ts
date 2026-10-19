@@ -182,7 +182,7 @@ describe('pinned tick order (spec §3)', () => {
     expect(state.phase).toBe('gameover');
     expect(state.stats.lives).toBe(0); // the reducer ran before the game-over check
     expect(state.currentJumpVelocity).toBe(INITIAL_JUMP_VELOCITY);
-    expect(state.clowns[0]).toMatchObject({ isOnDivingBoard: true, divingBoardIndex: 0, x: 60, y: 222 });
+    expect(state.clowns[0]).toMatchObject({ isOnDivingBoard: true, divingBoardIndex: 2, x: 740, y: 222 }); // issue #19: seated-left survivor → right pair
     expect(state.seesaw.tilt).toBe('left'); // one seated clown remains, on the left
   });
 
