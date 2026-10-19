@@ -38,10 +38,15 @@ export const createConsequences = (): ConsequenceReducer => (state, events) => {
         // one bonus jump when any remain, taking a life only at bonusJumps 0.
         // Evaluated against the RUNNING counters, so two deaths in one tick
         // each consume independently, in emission order.
+        // The life decrement is floored at 0 (issue #27, fuzz-minimized seed
+        // 22): a same-tick double death at lives 1 folded 1 → 0 → −1, but the
+        // spec (§3.5) never contemplates negative lives — game-over fires at
+        // 0 and the state must hold exactly that. Clamped per decrement, so
+        // the second same-tick death lands on 0, never below.
         if (bonusJumps > 0) {
           bonusJumps -= BONUS_JUMPS_ON_DEATH;
         } else {
-          lives -= LIVES_ON_DEATH;
+          lives = Math.max(0, lives - LIVES_ON_DEATH);
         }
         break;
       case 'level-completed':
