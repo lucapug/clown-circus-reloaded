@@ -182,7 +182,7 @@ describe('pinned tick order (spec §3)', () => {
     expect(state.phase).toBe('gameover');
     expect(state.stats.lives).toBe(0); // the reducer ran before the game-over check
     expect(state.currentJumpVelocity).toBe(INITIAL_JUMP_VELOCITY);
-    expect(state.clowns[0]).toMatchObject({ isOnDivingBoard: true, divingBoardIndex: 0, x: 60, y: 222 });
+    expect(state.clowns[0]).toMatchObject({ isOnDivingBoard: true, divingBoardIndex: 2, x: 740, y: 222 }); // issue #19: seated-left survivor → right pair
     expect(state.seesaw.tilt).toBe('left'); // one seated clown remains, on the left
   });
 
@@ -243,7 +243,7 @@ describe('pinned tick order (spec §3)', () => {
     expect(expectEvent(events, 'launched').clownIndex).toBe(1);
   });
 
-  it('kills a clown landing in the middle third and respawns it opposite its seesaw side', () => {
+  it('kills a clown landing in the middle third and respawns it on the FREE side (issue #19 unified rule)', () => {
     const { state, events } = step(
       playing({ balloons: [], clowns: [flying(400, LANDING_Y, 0, 0), seatedLeft(370)] }),
       [],
@@ -252,12 +252,18 @@ describe('pinned tick order (spec §3)', () => {
     const death = expectEvent(events, 'death');
     expect(death.cause).toBe('middle');
     expect(death.clownIndex).toBe(0);
-    // seesawSide 'right' → free side 'left' → upper-left board, index 0
-    expect(state.clowns[0]).toMatchObject({ isOnDivingBoard: true, divingBoardIndex: 0, x: 60, y: 222 });
+    // Issue #19 (owner decision 2026-10-19): entry side = opposite the SEATED
+    // clown (survivor left → right pair). The dying clown's stale seesawSide
+    // ('right', the flying() default) must be ignored — the old per-clown
+    // derivation (freeSideOf(clown.seesawSide)) sent the entrant to the left
+    // pair (board 0, x 60).
+    expect([2, 3]).toContain(state.clowns[0].divingBoardIndex); // right-side pair
+    expect(state.clowns[0].x).toBe(740);
+    expect(state.clowns[0].isOnDivingBoard).toBe(true);
     expect(state.currentJumpVelocity).toBe(INITIAL_JUMP_VELOCITY);
   });
 
-  it('kills a clown landing on the edge occupied by the other seated clown', () => {
+  it('kills a clown landing on the occupied edge and respawns it on the FREE side, not back at the occupier (issue #19)', () => {
     const { state, events } = step(
       playing({ balloons: [], clowns: [seatedLeft(370), flying(380, LANDING_Y, 0, 0)] }),
       [],
@@ -266,8 +272,13 @@ describe('pinned tick order (spec §3)', () => {
     const death = expectEvent(events, 'death');
     expect(death.cause).toBe('occupied-edge');
     expect(death.clownIndex).toBe(1);
-    // The dying clown's seesawSide is 'right' → free side 'left' → board index 0
-    expect(state.clowns[1]).toMatchObject({ isOnDivingBoard: true, divingBoardIndex: 0, x: 60 });
+    // Issue #19 (owner decision 2026-10-19): entry side = opposite the seated
+    // occupier (left → right pair). The old per-clown derivation read the
+    // dying clown's stale seesawSide ('right' → free 'left'), re-sending the
+    // entrant straight back to the occupier's side (board 0, x 60).
+    expect([2, 3]).toContain(state.clowns[1].divingBoardIndex); // right-side pair
+    expect(state.clowns[1].x).toBe(740);
+    expect(state.clowns[1].isOnDivingBoard).toBe(true);
   });
 
   it('sends a fall-off death to the board on the FREE side (seated left → right entry)', () => {
@@ -307,6 +318,24 @@ describe('pinned tick order (spec §3)', () => {
     );
     const death = expectEvent(events, 'death');
     expect(death.cause).toBe('fall-off');
+    expect([2, 3]).toContain(state.clowns[0].divingBoardIndex); // 2025 fallback side: right pair
+    expect(state.clowns[0].x).toBe(740);
+  });
+
+  it('falls back to the 2025 side (right) when no clown is seated at middle-death resolution (issue #19)', () => {
+    // Issue #19: middle shares fall-off's deterministic no-seated fallback.
+    // Both clowns fly, so no receiver exists; the dying clown's stale
+    // seesawSide is 'right', which the old per-clown derivation would have
+    // flipped to 'left' (board 0, x 60) — this discriminates the shared
+    // fallback too.
+    const { state, events } = step(
+      playing({ balloons: [], clowns: [flying(400, LANDING_Y, 0, 0), flying(200, 650, 0, 0)] }),
+      [],
+      createRng(1),
+    );
+    const death = expectEvent(events, 'death');
+    expect(death.cause).toBe('middle');
+    expect(death.clownIndex).toBe(0);
     expect([2, 3]).toContain(state.clowns[0].divingBoardIndex); // 2025 fallback side: right pair
     expect(state.clowns[0].x).toBe(740);
   });

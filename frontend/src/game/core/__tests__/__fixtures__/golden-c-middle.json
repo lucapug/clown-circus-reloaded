@@ -12,15 +12,15 @@
       "phase": "playing",
       "clowns": [
         {
-          "x": 60,
+          "x": 740,
           "y": 222,
           "vx": 0,
           "vy": 0,
           "isFlying": false,
           "isOnSeesaw": false,
-          "seesawSide": "left",
+          "seesawSide": "right",
           "isOnDivingBoard": true,
-          "divingBoardIndex": 0
+          "divingBoardIndex": 2
         },
         {
           "x": 370,
@@ -60,15 +60,15 @@
       "phase": "playing",
       "clowns": [
         {
-          "x": 60,
+          "x": 740,
           "y": 222,
           "vx": 0,
           "vy": 0,
           "isFlying": false,
           "isOnSeesaw": false,
-          "seesawSide": "left",
+          "seesawSide": "right",
           "isOnDivingBoard": true,
-          "divingBoardIndex": 0
+          "divingBoardIndex": 2
         },
         {
           "x": 370,
@@ -102,15 +102,15 @@
       "phase": "playing",
       "clowns": [
         {
-          "x": 60,
+          "x": 740,
           "y": 222,
           "vx": 0,
           "vy": 0,
           "isFlying": false,
           "isOnSeesaw": false,
-          "seesawSide": "left",
+          "seesawSide": "right",
           "isOnDivingBoard": true,
-          "divingBoardIndex": 0
+          "divingBoardIndex": 2
         },
         {
           "x": 370,
@@ -144,15 +144,15 @@
       "phase": "playing",
       "clowns": [
         {
-          "x": 60,
+          "x": 740,
           "y": 222,
           "vx": 0,
           "vy": 0,
           "isFlying": false,
           "isOnSeesaw": false,
-          "seesawSide": "left",
+          "seesawSide": "right",
           "isOnDivingBoard": true,
-          "divingBoardIndex": 0
+          "divingBoardIndex": 2
         },
         {
           "x": 370,
@@ -186,15 +186,15 @@
       "phase": "playing",
       "clowns": [
         {
-          "x": 60,
+          "x": 740,
           "y": 222,
           "vx": 0,
           "vy": 0,
           "isFlying": false,
           "isOnSeesaw": false,
-          "seesawSide": "left",
+          "seesawSide": "right",
           "isOnDivingBoard": true,
-          "divingBoardIndex": 0
+          "divingBoardIndex": 2
         },
         {
           "x": 370,
