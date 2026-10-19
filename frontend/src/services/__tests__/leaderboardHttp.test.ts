@@ -9,7 +9,7 @@
 // evidence: the retry reuses the stored submissionId, which is what makes a
 // double row impossible once a real §7 server exists. Live-server
 // integration is explicitly M3/M4 work, not claimable here.
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import {
   createHttpLeaderboardService,
   type FetchLike,
@@ -32,7 +32,7 @@ const requestBody = (init?: RequestInit): { name: string; score: number; submiss
   JSON.parse(String(init?.body));
 
 /** Stub whose POST persists into the "DB", then dies mid-flight (lost response). */
-const lostResponseStub = (db: Db): FetchLike =>
+const lostResponseStub = (db: Db): Mock<FetchLike> =>
   vi.fn(async (_url: string, init?: RequestInit) => {
     const body = requestBody(init);
     db.set(body.submissionId, { name: body.name, score: body.score });
@@ -40,7 +40,7 @@ const lostResponseStub = (db: Db): FetchLike =>
   });
 
 /** Healthy §7 server: 201 on new submissions, idempotent 201 replay on the same id, 409 on payload conflict. */
-const healthyStub = (db: Db, leaderboard: LeaderboardEntry[] = []): FetchLike =>
+const healthyStub = (db: Db, leaderboard: LeaderboardEntry[] = []): Mock<FetchLike> =>
   vi.fn(async (url: string, init?: RequestInit) => {
     if (String(url).includes('/leaderboard')) return jsonResponse(200, leaderboard);
     const body = requestBody(init);
@@ -53,7 +53,7 @@ const healthyStub = (db: Db, leaderboard: LeaderboardEntry[] = []): FetchLike =>
     return jsonResponse(201, {});
   });
 
-const postCalls = (stub: FetchLike) =>
+const postCalls = (stub: Mock<FetchLike>) =>
   stub.mock.calls.filter(([url]) => !String(url).includes('/leaderboard'));
 
 describe('submitScore classification (write-behind: enqueue happens before the POST)', () => {
@@ -114,7 +114,7 @@ describe('submitScore classification (write-behind: enqueue happens before the P
   it('timeout (stub hangs until abort, tiny timeoutMs) → queued (case 4)', async () => {
     const hanging: FetchLike = vi.fn(
       (_url: string, init?: RequestInit) =>
-        new Promise((_resolve, reject) => {
+        new Promise<Response>((_resolve, reject) => {
           init?.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
         }),
     );
@@ -177,7 +177,7 @@ describe('drainPendingSubmissions', () => {
 
     // Healthy for the first entry, dies again mid-flight for the second.
     let calls = 0;
-    const flaky: FetchLike = vi.fn(async (_url: string, init?: RequestInit) => {
+    const flaky = vi.fn(async (_url: string, init?: RequestInit) => {
       calls++;
       if (calls === 1) return jsonResponse(201);
       const body = requestBody(init);
