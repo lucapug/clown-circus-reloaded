@@ -11,6 +11,7 @@ import {
   BALLOON_ROW_SPACING,
   BALLOON_ROWS,
   BALLOONS_PER_ROW,
+  BONUS_JUMPS_ON_DEATH,
   BOARD_DAMPING,
   BOARD_HEIGHT,
   BOARD_LAUNCH_VX,
@@ -123,6 +124,13 @@ describe('core constants (spec §3.1/§3.4 pinned values)', () => {
     // entry SIDE is the free end of the seesaw and is asserted by the
     // tick-order death tests, never by height.
     expect(RESPAWN_BOARD_HEIGHT_INDEX).toBe(0);
+  });
+
+  it('pins the §3.3 death-consumption rate: one bonus jump spent per death (2026 design decision A)', () => {
+    // An explicit owner decision of 2026-10-15 (issue #8), NOT inferred 2025
+    // intent: a death with bonusJumps > 0 spends exactly one jump instead of
+    // one life.
+    expect(BONUS_JUMPS_ON_DEATH).toBe(1);
   });
 
   it('decouples the accumulator: dt = 1/30 runs exactly 2 ticks', () => {
