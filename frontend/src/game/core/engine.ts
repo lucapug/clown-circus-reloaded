@@ -124,8 +124,11 @@ export function step(
         clown.x = x + (clown.seesawSide === 'left' ? -SEAT_OFFSET : SEAT_OFFSET);
       }
     } else {
-      // Launch: diving-board clown first (§3.4), else the seated clown,
-      // both in clown-array order. Board launches draw nothing from the RNG.
+      // Launch: the diving-board clown, in clown-array order. Board launches
+      // draw nothing from the RNG. If no clown is on a diving board the input
+      // is a no-op — no event, no state change, no RNG draw (issue #35, spec
+      // §3.4: the seated clown flies only via the lever effect, i.e. the
+      // step-7 chain launch after the other clown's safe edge landing).
       const boardIdx = clowns.findIndex((c) => c.isOnDivingBoard);
       if (boardIdx !== -1) {
         const clown = clowns[boardIdx];
@@ -136,16 +139,6 @@ export function step(
         clown.vy = BOARD_LAUNCH_VY;
         clown.vx = direction * BOARD_LAUNCH_VX * levelMult;
         events.push({ type: 'launched', clownIndex: boardIdx as 0 | 1, via: 'input', vx: clown.vx, vy: clown.vy });
-      } else {
-        const seatedIdx = clowns.findIndex((c) => c.isOnSeesaw);
-        if (seatedIdx !== -1) {
-          const clown = clowns[seatedIdx];
-          clown.isFlying = true;
-          clown.isOnSeesaw = false;
-          clown.vy = currentJumpVelocity;
-          clown.vx = (rng.next() - 0.5) * 4 * levelMult; // seated-launch vx — one of the core's two RNG consumers (rng.ts; #20 added the entry-height draw)
-          events.push({ type: 'launched', clownIndex: seatedIdx as 0 | 1, via: 'input', vx: clown.vx, vy: clown.vy });
-        }
       }
     }
   }
