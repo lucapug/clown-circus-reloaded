@@ -503,12 +503,12 @@
       "phase": "playing",
       "clowns": [
         {
-          "x": 472.4485650844872,
-          "y": 361.80000000000007,
-          "vx": 0.4044150076806545,
-          "vy": -10.699999999999992,
-          "isFlying": true,
-          "isOnSeesaw": false,
+          "x": 426,
+          "y": 496,
+          "vx": 0,
+          "vy": 0,
+          "isFlying": false,
+          "isOnSeesaw": true,
           "seesawSide": "left",
           "isOnDivingBoard": false,
           "divingBoardIndex": null
@@ -979,7 +979,7 @@
         "x": 456,
         "y": 520,
         "width": 120,
-        "tilt": "center"
+        "tilt": "left"
       },
       "currentJumpVelocity": -14,
       "level": 1,
@@ -994,12 +994,12 @@
       "phase": "playing",
       "clowns": [
         {
-          "x": 484.58101531490684,
-          "y": 180.30000000000044,
-          "vx": 0.4044150076806545,
-          "vy": -1.69999999999999,
-          "isFlying": true,
-          "isOnSeesaw": false,
+          "x": 342,
+          "y": 496,
+          "vx": 0,
+          "vy": 0,
+          "isFlying": false,
+          "isOnSeesaw": true,
           "seesawSide": "left",
           "isOnDivingBoard": false,
           "divingBoardIndex": null
@@ -1423,7 +1423,7 @@
           "y": 180,
           "color": "yellow",
           "row": 3,
-          "popped": true
+          "popped": false
         },
         {
           "id": "3-9",
@@ -1431,7 +1431,7 @@
           "y": 180,
           "color": "yellow",
           "row": 3,
-          "popped": true
+          "popped": false
         },
         {
           "id": "3-10",
@@ -1470,7 +1470,7 @@
         "x": 372,
         "y": 520,
         "width": 120,
-        "tilt": "center"
+        "tilt": "left"
       },
       "currentJumpVelocity": -14,
       "level": 1,
@@ -1485,13 +1485,13 @@
       "phase": "playing",
       "clowns": [
         {
-          "x": 493,
+          "x": 433,
           "y": 496,
           "vx": 0,
           "vy": 0,
           "isFlying": false,
           "isOnSeesaw": true,
-          "seesawSide": "right",
+          "seesawSide": "left",
           "isOnDivingBoard": false,
           "divingBoardIndex": null
         },
@@ -1802,7 +1802,7 @@
           "y": 140,
           "color": "green",
           "row": 2,
-          "popped": true
+          "popped": false
         },
         {
           "id": "2-9",
@@ -1914,7 +1914,7 @@
           "y": 180,
           "color": "yellow",
           "row": 3,
-          "popped": true
+          "popped": false
         },
         {
           "id": "3-9",
@@ -1922,7 +1922,7 @@
           "y": 180,
           "color": "yellow",
           "row": 3,
-          "popped": true
+          "popped": false
         },
         {
           "id": "3-10",
@@ -1961,9 +1961,9 @@
         "x": 463,
         "y": 520,
         "width": 120,
-        "tilt": "right"
+        "tilt": "left"
       },
-      "currentJumpVelocity": -14.2,
+      "currentJumpVelocity": -14,
       "level": 1,
       "stats": {
         "score": 0,
@@ -1976,13 +1976,13 @@
       "phase": "playing",
       "clowns": [
         {
-          "x": 528,
+          "x": 468,
           "y": 496,
           "vx": 0,
           "vy": 0,
           "isFlying": false,
           "isOnSeesaw": true,
-          "seesawSide": "right",
+          "seesawSide": "left",
           "isOnDivingBoard": false,
           "divingBoardIndex": null
         },
@@ -2293,7 +2293,7 @@
           "y": 140,
           "color": "green",
           "row": 2,
-          "popped": true
+          "popped": false
         },
         {
           "id": "2-9",
@@ -2405,7 +2405,7 @@
           "y": 180,
           "color": "yellow",
           "row": 3,
-          "popped": true
+          "popped": false
         },
         {
           "id": "3-9",
@@ -2413,7 +2413,7 @@
           "y": 180,
           "color": "yellow",
           "row": 3,
-          "popped": true
+          "popped": false
         },
         {
           "id": "3-10",
@@ -2452,9 +2452,9 @@
         "x": 498,
         "y": 520,
         "width": 120,
-        "tilt": "right"
+        "tilt": "left"
       },
-      "currentJumpVelocity": -14.2,
+      "currentJumpVelocity": -14,
       "level": 1,
       "stats": {
         "score": 0,
