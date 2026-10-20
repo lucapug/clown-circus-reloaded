@@ -71,8 +71,6 @@ describe('createConsequences — pure fold over the tick events (D3)', () => {
     y: 0,
   });
 
-  const chainLaunch = (): GameEvent => ({ type: 'launched', clownIndex: 1, via: 'chain', vx: 1, vy: -14 });
-
   it('adds getBalloonScore for each balloon-popped event', () => {
     const result = consequences(base(), [pop('yellow'), pop('blue')]);
     expect(result.stats.score).toBe(getBalloonScore('yellow') + getBalloonScore('blue'));
@@ -204,9 +202,13 @@ describe('createConsequences — launch streak v2 (issue #24, fold-level)', () =
   });
 
   it('same-tick order pin [death, then chain]: no grant, the streak counts from the death reset', () => {
+    // Death first: it spends the STARTING jump (lives untouched), so the
+    // trailing chain launch finds no grant to fire — it only counts streak 1
+    // off the death reset. Contrast with the chain-first pin above: there the
+    // GRANT fires (bonusJumps ends 1, not 0) and the death spends the fresh jump.
     const result = consequences(base(JUMP_STREAK_GOAL - 1, 1), [{ type: 'death', clownIndex: 0, cause: 'middle' }, chainLaunch()]);
-    expect(result.stats.bonusJumps).toBe(0); // the death spent the starting jump; the chain grants nothing
-    expect(result.stats.lives).toBe(2); // no fresh jump to absorb it
+    expect(result.stats.bonusJumps).toBe(0); // the starting jump is spent; the chain grants nothing
+    expect(result.stats.lives).toBe(3); // the starting jump absorbed the death
     expect(result.stats.streak).toBe(1); // death reset to 0, then the chain launch counted
   });
 

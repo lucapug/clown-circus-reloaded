@@ -477,7 +477,16 @@ describe('launch streak v2 through step/advance (issue #24)', () => {
   });
 
   it('input launches never count toward the streak (AC-3)', () => {
-    const { state, events } = step(playing({ balloons: [] }), [{ type: 'launch' }], createRng(3), consequences);
+    // Two SEAT clowns (not the default board clown — a board launch would
+    // immediately re-bounce): the input launch sends clown 0 off the seat
+    // with vy −14, and the tick emits nothing but the launch.
+    const other = { ...seatedLeft(430), seesawSide: 'right' as const };
+    const { state, events } = step(
+      playing({ balloons: [], clowns: [seatedLeft(370), other] }),
+      [{ type: 'launch' }],
+      createRng(3),
+      consequences,
+    );
     const launched = events[0];
     expect(eventTypes(events)).toEqual(['launched']);
     expect(launched.type === 'launched' && launched.via).toBe('input');
