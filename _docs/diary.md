@@ -581,3 +581,26 @@ Owner merges PR #28 (+ PR #26 after the timbre listen) → #27/#11 close, **M2 6
 **End of day 2026-10-19 — M2 COMPLETE (6/6):** owner merged PR #26 (audio, after the worktree timbre listen) and PR #28 (lives floor, from the fuzz investigation). #11/#27 closed, branches deleted, /tmp PR-26 worktree removed, backlog map updated to 6/6 with #24 (conditional) and #27 (bugfix) added. C1 tomorrow (Oct 21 EOD) is effectively already satisfied on the game side — the formal check happens at tomorrow's close.
 
 **Tomorrow's first design task (owner request): session recording.** The owner wants play sessions recorded (logs/traces) so that any future "inexplicable game-over" comes with concrete evidence — the fuzz investigation convinced only partially ("non copre tutti gli edge cases", a fair critique: policy-fuzzing explores a space, not THE space). Design direction to evaluate tomorrow: the core is deterministic with an input queue and seeded RNG — a session recorder is therefore *exact replay technology*, not heuristic logging: record (game seed + every input event with its tick + periodic state snapshots) in the shell (outside `core/`, DEV-available like the debug hooks), store as a ring in localStorage with export/download, and a replay mode reusing the golden-fixture machinery. A recorded owner session becomes a deterministic reproduction any agent can replay tick-by-tick — the strongest possible "concrete trace". Scope and DEV-vs-prod gating to be decided in tomorrow's first cycle.
+
+## 2026-10-20 — Cycles #15 (issue #20, PR #29) and #16 (issue #30, PR #31): conditional slot used; the session recorder lands
+
+### What and why
+
+M2 closed a day early, so both owner-decided conditionals had room. **#20** (entry-height randomization from level 4, 50/50 seeded) landed first: one `rng.next()` per qualifying death-entry, no draw below level 4 (golden fixtures byte-stable by construction), spec §3.4 extended, `RESPAWN_BOARD_HEIGHT_INDEX` retired (its TODO resolved). **#30** is the owner-requested **session recorder** (design approved in the morning, marker key `M` approved): DEV-gated capture of seed + every input at its consuming tick + all events + 600-tick snapshots + terminal state + markers, localStorage ring (20) + JSON export via `__game.downloadSession()`, and a replay runner (`REPLAY_TRACE=<file> npm run replay`) that re-runs seed+inputs through the core and reports the first divergent tick — the owner's "concrete evidence" requirement answered with exact replay rather than logs.
+
+### Outcome and independent verdicts
+
+[PR #29](https://github.com/lucapug/clown-circus-reloaded/pull/29) — QA PASS (13/13 incl. byte-gate); reviewer REQUEST_CHANGES (2 minor: seed count, a false PR-body invariant claim) → **mini-agent trial #4** (f24977a/514e26e: 22 seeds, a genuinely discriminating same-tick level-up test, reworded body) → REVIEW APPROVE. Merged by the owner. [PR #31](https://github.com/lucapug/clown-circus-reloaded/pull/31) — 4 commits, 18 files, 230 tests (+1 env-gated skip). [QA VERDICT: PASS](https://github.com/lucapug/clown-circus-reloaded/pull/31#issuecomment-6288830384): real round-trip through the core, both production greps 0, **live CLI replay of an exported trace → ok, tampered → `first divergence at tick 240 (seesaw.x: expected 386, got 387)`**. [REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/31#issuecomment-6288773932) — zero findings above note; replay fidelity verified against the engine source (inputs drained at the first executed tick only; seed captured pre-draw; consequences stateless). Merge pending the owner.
+
+### Process incidents (recorded honestly)
+
+- **Usage-limit interruption**: the #30 engineer hit the harness's 5-hour usage cap mid-cycle (branch + 2 commits + uncommitted wiring left in the working tree, no agentId returned). Recovery: a FRESH engineer resumed from the working tree + the brief — the work lives in files, not in agent memory; this is the first demonstration that the cycle survives agent loss. Orchestrator error on the way: I mis-resumed the PM agent with engineer instructions (the interrupted engineer had no ID); stopped it within 43 s, tree verified untouched.
+- The PM brief contained a formula typo (snapshot predicate missing `/600`); the engineer implemented the normative §3 rule and disclosed — reviewer and QA both confirmed. Brief-vs-normative-text conflicts resolve toward the normative definition.
+
+### Measured ledger
+
+Cycle #15 (#20): PM 302,167 · engineer 1,736,919 · QA 1,134,134 · reviewer 227,757 · mini-agent 1,211,485 · reviewer close-out 244,913 → ≈ 4.86M. Cycle #16 (#30): PM 495,597 · engineer (interrupted, unmeasured) + resume 1,571,979 · QA 1,568,674 · reviewer 348,905 → ≈ 3.99M measurable. Mini-agent trial #4: 1.21M for 4 items incl. a new discriminating test — consistent with trial #3's scale; the P1.4 consolidation should model the mini-agent as a ~1M fixed-cost tool for anything beyond a one-liner.
+
+### Next
+
+Owner merges PR #31 → plays the "allo sfinimento" session WITH the recorder (M at suspicious moments; `__game.downloadSession()` at game over; traces attach to any report; `REPLAY_TRACE=<file> npm run replay` reproduces). #24 (streak) tomorrow morning; C1 tomorrow EOD; M3 starts after.
