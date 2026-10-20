@@ -627,3 +627,21 @@ PM 731,186 · engineer 6,424,573 · QA 1,153,237 · reviewer 753,257 → **≈ 9
 ### Next
 
 Owner merges PR #32 (#24 closes; M2 + conditionals complete). **C1 Oct 21 EOD** — the formal check (all criteria already green in practice). Then M3 (backend/DB/contract) with decision C (log-only) and the #10 contract-alignment relay.
+
+## 2026-10-20 — Recorder download bug (issue #33, PR #34) + the owner's methodology finding on browser QA
+
+### What and why
+
+The owner's first recorded play session surfaced that `__game.downloadSession()` "does not work — an error flashed and vanished, not reproducible". The investigation (real browser, Playwright download events, A/B in fresh tabs) found **two defects**: (A) `URL.revokeObjectURL` called synchronously 0.8 ms after `anchor.click()` races the browser's async blob read → *download interrupted* with an auto-dismissing "Failed — Network error" bubble and **no console error** (hence uncapturable); (B) `downloadSession()` consulted only the in-memory recorder → silent `null` before the first start of a page load, never falling back to the localStorage ring the owner could see in DevTools. Fix (PR #34): deferred revoke (10 s) + ring-newest fallback + console.info instead of silent null; tests pin the anchor lifecycle (connected anchor, no sync revoke, revoke after 10 s) and the fallback chain. [REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/34#issuecomment-6293672643) · [QA (targeted, no-browser): PASS](https://github.com/lucapug/clown-circus-reloaded/pull/34#issuecomment-6294014640). Merge pending the owner. Gap exposed: PR #31's QA exported its replay trace from the TEST env, never exercising the browser download path — the owner's real use found it in minutes.
+
+### The owner's methodology finding (applied at the source)
+
+The owner observed that agents' "live-browser" checks open the game screen but **do not actually play** (the automation injects synthetic events; it cannot deliver hardware input), and that download/permission popups require the owner's confirmation — human interventions were destabilizing the analyses. Conclusion adopted: browser automation is for **mechanism checks only**, never gameplay acceptance; **gameplay/behavior acceptance = the owner's real play + recorder traces**. `qa.md` updated with this rule (plus: never start servers on the owner's ports). The recorder built this morning is exactly the structural answer: the owner plays, the trace is the evidence, agents replay.
+
+### Ledger
+
+Investigation 1,538,002 · engineer 1,497,784 · QA (interrupted by owner message, unmeasured) + targeted completion 431,891 · reviewer 167,035 → ≈ 3.63M measurable.
+
+### Next
+
+Owner merges PR #34 (then downloads work in their session) and PR #32 (streak — after the current session, since it changes the earning rule). C1 tomorrow EOD; M3 after.

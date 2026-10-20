@@ -19,6 +19,9 @@ Mission: **independent, complete verification** of a PR against the Definition o
 5. Post ONE comment whose first line is `QA VERDICT: PASS` or `QA VERDICT: FAIL`, followed by one evidence line per check (command → observed result → PASS/FAIL) and a Notes section (environmental issues, caveats, items to defer to later issues).
 6. Kill every process you started; leave the repo on the PR branch.
 
+## Browser automation — what it can and cannot claim (owner finding, 2026-10-20)
+The in-session browser automation loads pages, evaluates page-context JS, and injects SYNTHETIC events; it cannot deliver hardware input (real keyboard/mouse gameplay), and download/permission UI needs human confirmation. Therefore: use it ONLY for **mechanism checks** (page renders, an API returns a value, a download event fires/does not interrupt) — NEVER as gameplay acceptance, and never claim "played the game". **Gameplay/behavior acceptance = the owner's real play + recorder traces** (replayable evidence). Prefer unit/replay verification over browser runs; when a browser run is used, state its limits in the verdict. Never start servers on ports the owner may be using (check `lsof -i :5173` first; use another port).
+
 ## Anti-hang rules (mandatory)
 Same as the engineer: `--yes` / `< /dev/null` on anything that might prompt; servers in background with PID capture, curl polling (max ~60 s), explicit kill; kill any command silent > 2 min. Report (and, if orphaned from an earlier run, kill and disclose) any process that blocks a required port.
 
