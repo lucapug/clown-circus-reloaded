@@ -647,3 +647,26 @@ Investigation 1,538,002 · engineer 1,497,784 · QA (interrupted by owner messag
 Owner merges PR #34 (then downloads work in their session) and PR #32 (streak — after the current session, since it changes the earning rule). C1 tomorrow EOD; M3 after.
 
 **Update (same day):** owner merged PR #34 (`#33` closed); the cancelled QA run had left an orphaned dev server on :5199 — killed by the orchestrator (owner's :5173 untouched; the new qa.md port rule exists for exactly this). Owner idea logged for follow-up: unconditional capture + marker-filtered replay — note that the ring ALREADY persists every finalized session automatically; the manual step is only the file download. Follow-up candidates: `__game.sessions().filter(s => s.markers.length)` (works today from the console), a `downloadMarked()` bulk export, and a replay-runner flag to select marked sessions.
+
+## 2026-10-20 — Cycle #18 (issue #35, PR #36): lever-only launch (owner realism decision)
+
+### What and why
+
+The owner, play-testing, found that clicking launches the seated clown at will (double flights, the source of the lives −1 edge class) and argued from physics: a seated clown rises only via the lever — the other clown's safe landing. Decision: the launch input launches ONLY the diving-board clown; otherwise no-op; the seated clown flies only via the chain launch. Spec §3.4 updated first (owner-approved text, `bc36da2`), then the kernel change. The corollary is a structural guarantee: at most one clown flies at any time; the stalled both-seated state is unreachable; the double-death input path is closed at the source.
+
+### Outcome and independent verdicts
+
+[PR #36](https://github.com/lucapug/clown-circus-reloaded/pull/36) — 3 commits (red no-op/zero-RNG test → engine removal → invariant + fixture regeneration), 7 files, exactly one golden fixture regenerated (byte-gate per the brief's prediction: only scenario A contained a manual seated launch). [QA VERDICT: PASS](https://github.com/lucapug/clown-circus-reloaded/pull/36#issuecomment-6295440074); [REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/36#issuecomment-6295395033) — zero findings above note; the invariant test proven non-vacuous (it would have tripped pre-fix: two-flying was input-reachable). Third consecutive zero-rework cycle. Merge pending the owner.
+
+### Measured ledger
+
+PM 379,175 · engineer 1,529,921 · QA 691,652 · reviewer 398,887 → **≈ 3.20M**, 138 tool uses. Zero stalls, zero rework.
+
+### Lessons
+
+- The owner's physics reasoning ("lever only") collapsed a bug class at the design layer: the #27 lives-floor fix stays as a defensive clamp, but its input path is now unreachable — design decisions can be stronger than fixes.
+- The stale test-title note (golden-tick scenario title still says "seated launch") is the cost of tight file-scoping per cycle — acceptable, tracked as a follow-up line rather than expanding this PR's scope.
+
+### Next
+
+Owner merges PR #36 (#35 closes). All M2 + conditionals then complete: #9/#19/#27/#30/#33/#35 extras + the six MUSTs. C1 Oct 21 EOD (formal check + diary), then M3 (backend/DB/contract) with decision C (log-only) and the #10 contract-alignment relay.
