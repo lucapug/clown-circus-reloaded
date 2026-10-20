@@ -154,7 +154,7 @@ const CircusGameInner = ({
 
   return (
     <div className="flex flex-col items-center gap-4 p-4 min-h-screen">
-      <GameHUD score={frame.state.stats.score} lives={frame.state.stats.lives} bonusJumps={frame.state.stats.bonusJumps} />
+      <GameHUD score={frame.state.stats.score} lives={frame.state.stats.lives} bonusJumps={frame.state.stats.bonusJumps} streak={frame.state.stats.streak ?? 0} />
 
       {droppedCount > 0 && (
         <p data-testid="sync-notice" className="text-xs text-destructive pixel-font" role="status">

@@ -106,7 +106,12 @@ export const ROW_BONUS_POINTS: Record<(typeof BALLOON_ROW_COLORS)[number], numbe
   blue: 1000,
 };
 export const EDGE_LANDING_BONUS = 10; // "Bounce (land on seesaw edge)", §3.2
-export const BONUS_JUMPS_FOR_BLUE_ROW = 1; // §3.3 EARNING only; spending is BONUS_JUMPS_ON_DEATH
+// §3.3 v2 EARNING (owner decision, issue #24 — replaces blue-row earning):
+// consecutive chain launches (completed safe launch cycles) needed to earn
+// +1 bonusJumps; the streak resets at the goal and on any death. A
+// CALIBRATION PARAMETER — tune with real M5 telemetry once observability is
+// live; HUD and StartScreen import this constant.
+export const JUMP_STREAK_GOAL = 25;
 export const LIVES_ON_LEVEL_UP = 1; // §3.5
 export const LIVES_ON_DEATH = 1; // §3.5
 // §3.3 CONSUMPTION — 2026 design decision A (an explicit owner decision of

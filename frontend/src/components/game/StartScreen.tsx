@@ -1,4 +1,5 @@
 import type { LeaderboardEntry } from '../../services/leaderboard';
+import { JUMP_STREAK_GOAL } from '../../game/core';
 import { PixelButton } from './ui';
 
 interface StartScreenProps {
@@ -112,9 +113,11 @@ export const StartScreen = ({ onStart, leaderboard, offline = false }: StartScre
                 <span className="text-primary text-lg">★</span>
                 <span className="text-muted-foreground">Clear row = Bonus!</span>
               </div>
-              {/* Player-facing doc of the §3.3 mechanic (owner request, rework loop 2): blue rows earn a Jump; a Jump absorbs one crash. */}
+              {/* Player-facing doc of the §3.3 v2 mechanic (issue #24): JUMP_STREAK_GOAL chain launches
+                  without a crash earn a Jump; a Jump absorbs one crash. Interpolated from the constant
+                  so a recalibration cannot silently desync the UI. */}
               <div className="col-span-2 text-muted-foreground mt-1">
-                Clear the blue row = +1 Jump · A Jump absorbs one crash
+                {`${JUMP_STREAK_GOAL} launches without a crash = +1 Jump · A Jump absorbs one crash`}
               </div>
             </div>
           </div>

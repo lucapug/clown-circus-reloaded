@@ -45,6 +45,16 @@ export interface GameStats {
   score: number;
   lives: number;
   bonusJumps: number;
+  /**
+   * #24 launch streak: consecutive `launched{via:'chain'}` events toward
+   * JUMP_STREAK_GOAL (reset at the goal and on any death). The consequences
+   * fold is the ONLY writer and always emits it as a number after a real
+   * fold; it is ABSENT under nullConsequences and in fresh initial state —
+   * readers default with `?? 0`. The goal is deliberately NOT tracked in
+   * state: import JUMP_STREAK_GOAL instead, so recalibration propagates with
+   * zero state churn.
+   */
+  streak?: number;
 }
 
 export interface GameState {

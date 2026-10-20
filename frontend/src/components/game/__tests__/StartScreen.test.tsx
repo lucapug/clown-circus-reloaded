@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { JUMP_STREAK_GOAL } from '../../../game/core';
 import type { LeaderboardEntry } from '../../../services/leaderboard';
 import { StartScreen } from '../StartScreen';
 
@@ -22,7 +23,9 @@ describe('StartScreen (issue #9 DoD b)', () => {
     expect(screen.getByText('Green: 50 pts')).toBeInTheDocument();
     expect(screen.getByText('Blue: 100 pts')).toBeInTheDocument();
     expect(screen.getByText('Clear row = Bonus!')).toBeInTheDocument();
-    expect(screen.getByText('Clear the blue row = +1 Jump · A Jump absorbs one crash')).toBeInTheDocument();
+    expect(
+      screen.getByText(`${JUMP_STREAK_GOAL} launches without a crash = +1 Jump · A Jump absorbs one crash`),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'START GAME' })).toBeInTheDocument();
     expect(screen.getByText('Click or press SPACE to begin')).toBeInTheDocument();
   });

@@ -26,6 +26,7 @@ import {
   FALL_OFF_Y,
   GRAVITY,
   INITIAL_JUMP_VELOCITY,
+  JUMP_STREAK_GOAL,
   JUMP_VELOCITY_STEP,
   LANDING_Y,
   LEVEL_MULT_STEP,
@@ -129,6 +130,14 @@ describe('core constants (spec §3.1/§3.4 pinned values)', () => {
     // tests and the entry-height suite, never by these constants.
     expect(RANDOM_HEIGHT_START_LEVEL).toBe(4);
     expect(RANDOM_HEIGHT_PROBABILITY).toBe(0.5);
+  });
+
+  it('pins the §3.3 v2 jump-streak goal: 25 chain launches per earned jump (issue #24)', () => {
+    // Owner decision (issue #24): the launch streak replaces blue-row
+    // earning; 25 is a calibration parameter, to be tuned with real M5
+    // telemetry — HUD and StartScreen import this constant so a future
+    // recalibration cannot desync the UI.
+    expect(JUMP_STREAK_GOAL).toBe(25);
   });
 
   it('pins the §3.3 death-consumption rate: one bonus jump spent per death (2026 design decision A)', () => {

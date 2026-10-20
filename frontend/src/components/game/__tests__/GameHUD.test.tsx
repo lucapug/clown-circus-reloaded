@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { cleanup, render, screen } from '@testing-library/react';
+import { JUMP_STREAK_GOAL } from '../../../game/core';
 import { GameHUD } from '../GameHUD';
 
 afterEach(cleanup);
@@ -16,6 +17,17 @@ describe('GameHUD (issue #9 DoD a)', () => {
     render(<GameHUD score={0} lives={3} bonusJumps={0} />);
     expect(screen.getByText('Jumps')).toBeInTheDocument();
     expect(screen.getByTestId('hud-jumps')).toHaveTextContent('0');
+  });
+
+  it('renders the Streak counter unconditionally, defaulting to 0/25 (issue #24)', () => {
+    render(<GameHUD score={0} lives={3} bonusJumps={0} />);
+    expect(screen.getByText('Streak')).toBeInTheDocument();
+    expect(screen.getByTestId('hud-streak')).toHaveTextContent(`0/${JUMP_STREAK_GOAL}`);
+  });
+
+  it('renders the live streak against the goal (12 of 25)', () => {
+    render(<GameHUD score={0} lives={3} bonusJumps={2} streak={12} />);
+    expect(screen.getByTestId('hud-streak')).toHaveTextContent(`12/${JUMP_STREAK_GOAL}`);
   });
 
   it('renders at least 3 pips with filled = lives when below 3', () => {
