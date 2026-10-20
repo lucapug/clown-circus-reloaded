@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test": "vitest run",
+    "replay": "vitest run src/game/recorder/__tests__/replayTrace.cli.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {

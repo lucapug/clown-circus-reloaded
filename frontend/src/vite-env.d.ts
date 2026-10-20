@@ -11,3 +11,8 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+// Issue #30: build-time global from the vite define — `git rev-parse HEAD`
+// at build/dev-server start. Vitest reuses vite.config.ts, so unit tests
+// see it too.
+declare const __APP_GIT_SHA__: string;
