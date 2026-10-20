@@ -20,6 +20,7 @@ graph TD
         I8["#8 Progression + bonusJumps (2026 dec. A) ✅ merged"]
         I9["#9 Canvas shell, HUD, screens ✅ merged"]
     I30["#30 Session recorder ✅ merged"]
+    I33["#33 Recorder download fix ✅ merged"]
         I10["#10 Services + mocks + offline queue ✅ merged"]
         I11["#11 Synthesized audio ✅ merged"]
         I19["#19 Free-side unification ✅ merged"]
@@ -45,6 +46,7 @@ graph TD
     I11 -.-> I20
     I7 -.-> I24
     I9 --> I30
+    I30 --> I33
     I24 -.-> I27
 ```
 

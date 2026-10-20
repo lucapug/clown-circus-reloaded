@@ -645,3 +645,5 @@ Investigation 1,538,002 · engineer 1,497,784 · QA (interrupted by owner messag
 ### Next
 
 Owner merges PR #34 (then downloads work in their session) and PR #32 (streak — after the current session, since it changes the earning rule). C1 tomorrow EOD; M3 after.
+
+**Update (same day):** owner merged PR #34 (`#33` closed); the cancelled QA run had left an orphaned dev server on :5199 — killed by the orchestrator (owner's :5173 untouched; the new qa.md port rule exists for exactly this). Owner idea logged for follow-up: unconditional capture + marker-filtered replay — note that the ring ALREADY persists every finalized session automatically; the manual step is only the file download. Follow-up candidates: `__game.sessions().filter(s => s.markers.length)` (works today from the console), a `downloadMarked()` bulk export, and a replay-runner flag to select marked sessions.
