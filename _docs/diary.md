@@ -689,3 +689,5 @@ Owner merges PR #36 (#35 closes). All M2 + conditionals then complete: #9/#19/#2
 **Come lavorare col recorder (owner):** gioca su `npm run dev`; `M` = marcaposto; a fine partita `__game.downloadSession()` in console; per sessioni più vecchie `__game.sessions()[i]` + `copy(JSON.stringify(...))`; replay con `REPLAY_TRACE=<file> npm run replay` da `frontend/`. Le tracce sono SHA-bound: `version-mismatch` → si rigiocano contro il commit di registrazione (worktree).
 
 **Lezioni vive per la nuova sessione:** checkout-main-first su ogni scrittura repo; browser automation = mechanism checks only (gameplay = owner + tracce); brief-vs-spec → vince la spec; il fuzz del core deterministic è la verifica più forte disponibile (2 round, 4.17M, ha chiuso il report owner e trovato #27).
+
+**Session close 2026-10-20:** owner merged PR #32 (streak) and PR #36 (lever-only) — **M2 fully complete: 6/6 MUSTs + #19, #20, #24, #27, #30, #33 extras**. All gameplay rules 2026 decided and on `main`. Tomorrow: C1 formal check (criteria already green) then M3 (backend/DB/contract). Session handoff entry above.
