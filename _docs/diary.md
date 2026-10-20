@@ -604,3 +604,26 @@ Cycle #15 (#20): PM 302,167 · engineer 1,736,919 · QA 1,134,134 · reviewer 22
 ### Next
 
 Owner merges PR #31 → plays the "allo sfinimento" session WITH the recorder (M at suspicious moments; `__game.downloadSession()` at game over; traces attach to any report; `REPLAY_TRACE=<file> npm run replay` reproduces). #24 (streak) tomorrow morning; C1 tomorrow EOD; M3 starts after.
+
+## 2026-10-20 — Cycle #17 (issue #24, PR #32): jump earning v2 — the streak lands
+
+### What and why
+
+The last conditional: jump earning moves from the blue-row clear (nearly coincident with level completion — owner's play-testing insight) to a **25-chain-launch streak without death** (the owner's skill-based design). Blue row keeps 1000 points only; death resets the streak in both Option-A branches; level-up does not reset (a deathless rally spans levels); HUD shows `Streak: k/25` always visible; start-screen hint replaced with interpolated-constant wording (recalibration cannot desync the UI). Spec §3.3 v2 was already committed — this cycle makes the implementation match it.
+
+### Outcome and independent verdicts
+
+[PR #32](https://github.com/lucapug/clown-circus-reloaded/pull/32) — 3 commits (26-test red → fold → UI), 247 tests, CI 6/6, fixtures byte-stable via the optional `stats.streak` shape. [QA VERDICT: PASS](https://github.com/lucapug/clown-circus-reloaded/pull/32#issuecomment-6292711074) — all 10 DoD points re-run; all four engineer-disclosed deviations independently re-derived and confirmed correct. [REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/32#issuecomment-6292700690) — zero findings above note; both PM-flagged resolutions endorsed; M4/M5 notes recorded (the recorder digest omits streak by design — adding it later needs a trace-format version bump). Merge pending the owner.
+
+### Measured ledger
+
+PM 731,186 · engineer 6,424,573 · QA 1,153,237 · reviewer 753,257 → **≈ 9.06M** — the second-largest cycle; the size is the ripple through existing exact-stat pins (a reward-rule change touches every pin that observed stats). Zero stalls, zero rework — second consecutive clean cycle.
+
+### Lessons
+
+- Reward-rule changes are pin-heavy by nature: the red commit alone flipped 26 expectations. The byte-stable-fixtures decision (#7) contained the blast radius to test files only.
+- The reviewer's M4/M5 note is forward architecture: trace-format evolution needs version bumps (the envelope already has `formatVersion`).
+
+### Next
+
+Owner merges PR #32 (#24 closes; M2 + conditionals complete). **C1 Oct 21 EOD** — the formal check (all criteria already green in practice). Then M3 (backend/DB/contract) with decision C (log-only) and the #10 contract-alignment relay.
