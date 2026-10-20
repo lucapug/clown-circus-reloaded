@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { createAudioEventMapper, createAudioService, type AudioService } from '../../game/audio';
 import { useGameLoop } from '../../game/useGameLoop';
 import type { GameLoopApi } from '../../game/useGameLoop';
+import { createSessionRecorder } from '../../game/recorder/sessionRecorder';
+import type { SessionRecorder } from '../../game/recorder/sessionRecorder';
 import {
   createDefaultLeaderboardService,
   type LeaderboardEntry,
@@ -40,7 +42,26 @@ const CircusGameLive = ({
   // Live path only (#11 decision 6): the AudioContext is lazy — nothing is
   // created until the first sound, which always descends from SPACE/click.
   const [audio] = useState<AudioService>(() => injectedAudio ?? createAudioService());
-  const loop = useGameLoop({ onEvents: createAudioEventMapper(audio) });
+  // #30: DEV-gated at the call site (same mechanism as the __game install) —
+  // in production the recorder is never constructed and the recorder module
+  // is eliminated from the bundle.
+  const [recorder] = useState<SessionRecorder | undefined>(() =>
+    import.meta.env.DEV ? createSessionRecorder({ appVersion: __APP_GIT_SHA__ }) : undefined,
+  );
+  const loop = useGameLoop({ onEvents: createAudioEventMapper(audio), recorder });
+  const phase = loop.frame.state.phase;
+
+  // #30: the M-key marker — DEV only, playing only. Pressing M flags the
+  // exact current tick of a suspicious moment in the active recording.
+  useEffect(() => {
+    if (!import.meta.env.DEV || !recorder) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code === 'KeyM' && phase === 'playing') recorder.marker(loop.getTick?.() ?? 0);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [recorder, phase, loop]);
+
   return <CircusGameInner loop={loop} service={service} audio={audio} />;
 };
 
