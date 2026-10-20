@@ -143,7 +143,7 @@ export function step(
           clown.isFlying = true;
           clown.isOnSeesaw = false;
           clown.vy = currentJumpVelocity;
-          clown.vx = (rng.next() - 0.5) * 4 * levelMult; // the one RNG draw in the core
+          clown.vx = (rng.next() - 0.5) * 4 * levelMult; // seated-launch vx — one of the core's two RNG consumers (rng.ts; #20 added the entry-height draw)
           events.push({ type: 'launched', clownIndex: seatedIdx as 0 | 1, via: 'input', vx: clown.vx, vy: clown.vy });
         }
       }
