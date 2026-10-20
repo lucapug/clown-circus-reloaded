@@ -1,12 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { FALL_OFF_Y, GRAVITY, INITIAL_JUMP_VELOCITY, JUMP_VELOCITY_STEP, LANDING_Y, TICK_DURATION } from '../constants';
+import {
+  EDGE_LANDING_BONUS,
+  FALL_OFF_Y,
+  GRAVITY,
+  INITIAL_JUMP_VELOCITY,
+  JUMP_STREAK_GOAL,
+  JUMP_VELOCITY_STEP,
+  LANDING_Y,
+  TICK_DURATION,
+} from '../constants';
 import { createConsequences } from '../consequences';
 import type { GameEvent } from '../events';
 import { advance, step } from '../engine';
 import { createRng } from '../rng';
 import { getBalloonScore, getRowBonus } from '../scoring';
 import { createBalloonGrid, createInitialState } from '../state';
-import type { Balloon, Clown, GameState } from '../types';
+import type { Balloon, Clown, GameState, GameStats } from '../types';
 
 // Issue #7 AC-2/AC-3/AC-4: scoring asserted THROUGH the kernel — step() and
 // advance() receive createConsequences() and stats come back changed. This is
@@ -53,6 +62,31 @@ const gridWithLastAt = (id: string, x: number, y: number): Balloon[] =>
 
 const eventTypes = (events: GameEvent[]): string[] => events.map((e) => e.type);
 
+/**
+ * One #24 safe-landing launch cycle (the landed-edge fixture pattern): the
+ * flyer lands the right edge and the seated clown chain-launches. Stats carry
+ * forward between cycles; the clown pair is rebuilt each cycle (kernel purity,
+ * tick-order precedent). Returns the folded stats and the last tick's events.
+ */
+const runLaunchCycles = (
+  n: number,
+  stats: GameStats = { score: 0, lives: 3, bonusJumps: 0 },
+): { stats: GameStats; lastEvents: GameEvent[] } => {
+  let current = stats;
+  let lastEvents: GameEvent[] = [];
+  for (let i = 0; i < n; i++) {
+    const { state, events } = step(
+      playing({ balloons: [], clowns: [flying(440, LANDING_Y, 0, 0), seatedLeft(370)], stats: current }),
+      [],
+      createRng(11),
+      consequences,
+    );
+    current = state.stats;
+    lastEvents = events;
+  }
+  return { stats: current, lastEvents };
+};
+
 describe('live-path scoring through step/advance (spec §3.2–§3.3)', () => {
   it('scores a green row clear through step: pop + row bonus, bonusJumps unchanged (AC-3 green)', () => {
     // Row 1 (green) reduced to one balloon on the flying clown's
@@ -75,7 +109,7 @@ describe('live-path scoring through step/advance (spec §3.2–§3.3)', () => {
     expect(state.level).toBe(1);
   });
 
-  it('scores two pops in one tick plus a blue row bonus, earning a bonus jump (AC-3 blue)', () => {
+  it('scores two pops in one tick plus a blue row bonus, earning NO jump (#24: the row grants points only)', () => {
     // Two blue row-0 balloons straddle the clown's post-integration position;
     // '3-13' keeps the level alive. Array order: later-in-space pops first.
     const laterInSpace: Balloon = { id: '0-1', x: 129, y: 100, color: 'blue', row: 0, popped: false };
@@ -90,7 +124,8 @@ describe('live-path scoring through step/advance (spec §3.2–§3.3)', () => {
 
     expect(eventTypes(events)).toEqual(['balloon-popped', 'balloon-popped', 'row-cleared']);
     expect(state.stats.score).toBe(2 * getBalloonScore('blue') + getRowBonus('blue')); // 200 + 1000
-    expect(state.stats.bonusJumps).toBe(1); // blue row clear earns exactly +1
+    expect(state.stats.bonusJumps).toBe(0); // #24: no blue-row earning — the discriminating flip
+    expect(state.stats.streak).toBe(0); // a row clear is not a launch cycle
     expect(state.stats.lives).toBe(3);
   });
 
@@ -145,18 +180,19 @@ describe('live-path scoring through step/advance (spec §3.2–§3.3)', () => {
 
     expect(eventTypes(events)).toEqual(['balloon-popped', 'row-cleared', 'level-completed', 'landed-edge', 'launched']);
     expect(state.stats.score).toBe(getBalloonScore('blue') + getRowBonus('blue') + 10); // 100 + 1000 + 10
-    expect(state.stats.bonusJumps).toBe(1);
+    expect(state.stats.bonusJumps).toBe(0); // #24: the blue row grants points only
+    expect(state.stats.streak).toBe(1); // the same tick's chain launch counts toward the streak
     expect(state.stats.lives).toBe(4); // 3 + LIVES_ON_LEVEL_UP
     expect(state.level).toBe(2); // kernel, same tick
     expect(state.balloons).toHaveLength(56);
     expect(state.balloons.every((b) => !b.popped)).toBe(true);
   });
 
-  it('nets +1 life and a spent jump on a same-tick level-up + death — earn precedes spend in the fold', () => {
-    // The last balloon pops AND the clown lands the middle third. Emission
-    // order puts row-cleared (+1 earned jump, §3.3 EARNING) BEFORE the death,
-    // so the death spends that same-tick jump: level-completed's +1 life is
-    // never deducted back (issue #8 fold-order pin; 2026-10-15 decision A).
+  it('hands the level-up life back when the same-tick death finds no jump (#24: rows no longer earn)', () => {
+    // The last balloon pops AND the clown lands the middle third. Under #24
+    // the row-cleared no longer earns a jump, so the death finds bonusJumps 0
+    // and takes a life — handing back the level-completed +1 (#24 flip; the
+    // earn-precedes-spend fold-order rule itself is pinned in scoring.test).
     const before = playing({
       balloons: gridWithLastAt('0-0', 440, LANDING_Y + GRAVITY),
       clowns: [flying(440, LANDING_Y, 0, 0), seatedLeft(370)],
@@ -167,13 +203,14 @@ describe('live-path scoring through step/advance (spec §3.2–§3.3)', () => {
     const { state, events } = step(before, [], createRng(11), consequences);
 
     expect(eventTypes(events)).toEqual(['balloon-popped', 'row-cleared', 'level-completed', 'death']);
-    expect(state.stats.lives).toBe(3); // 2 + 1: the death spends a jump, not this life
+    expect(state.stats.lives).toBe(2); // 2 + 1 − 1: nothing absorbs the death anymore
     expect(state.stats.score).toBe(getBalloonScore('blue') + getRowBonus('blue')); // no edge bonus
-    expect(state.stats.bonusJumps).toBe(0); // earned by row-cleared, spent by the death
+    expect(state.stats.bonusJumps).toBe(0);
+    expect(state.stats.streak).toBe(0); // death reset; no chain launch in this tick to re-count
     expect(state.level).toBe(2);
     expect(state.balloons).toHaveLength(56);
     expect(state.currentJumpVelocity).toBe(INITIAL_JUMP_VELOCITY);
-    expect(state.phase).toBe('playing'); // 3 lives left: no game-over
+    expect(state.phase).toBe('playing'); // 2 lives left: no game-over
   });
 });
 
@@ -210,7 +247,7 @@ describe('bonusJumps consumption through step/advance (spec §3.3 decision A)', 
     const folded = consequences(playing({ stats: { score: 0, lives: 3, bonusJumps: 1 } }), [
       { type: 'death', clownIndex: 0, cause: 'fall-off' },
     ]);
-    expect(folded.stats).toEqual({ score: 0, lives: 3, bonusJumps: 0 });
+    expect(folded.stats).toEqual({ score: 0, lives: 3, bonusJumps: 0, streak: 0 }); // death also resets the streak
   });
 
   it('delays game-over: a jump-backed death keeps playing; the next death ends the game with game-over last', () => {
@@ -244,26 +281,24 @@ describe('bonusJumps consumption through step/advance (spec §3.3 decision A)', 
     expect(second.state.phase).toBe('gameover');
   });
 
-  it('dead-end impossibility: a jump earned by a real tick is spent by the next death (AC-3, live path)', () => {
-    // Earn: one real kernel tick pops the last two blue row-0 balloons
-    // (keeper '3-13' keeps the level alive), folding row-cleared → +1 jump.
-    const laterInSpace: Balloon = { id: '0-1', x: 129, y: 100, color: 'blue', row: 0, popped: false };
-    const earlierInSpace: Balloon = { id: '0-0', x: 80, y: 100, color: 'blue', row: 0, popped: false };
-    const keeper: Balloon = { id: '3-13', x: 720, y: 180, color: 'yellow', row: 3, popped: false };
-    const earned = step(
-      playing({ balloons: [laterInSpace, earlierInSpace, keeper], clowns: [flying(105, 100, 0, 0), seatedLeft(370)] }),
-      [],
-      createRng(1),
-      consequences,
-    );
-    expect(eventTypes(earned.events)).toEqual(['balloon-popped', 'balloon-popped', 'row-cleared']);
-    expect(earned.state.stats.bonusJumps).toBe(1); // blue row clear earned it
-    expect(earned.state.stats.lives).toBe(3);
+  it('dead-end impossibility: a jump earned by real launch cycles is spent by the next death (AC-3, live path)', () => {
+    // Earn v2 (#24): 25 real chain-launch cycles grant +1 jump and reset the
+    // streak; 24 more rebuild a live streak of 24 — all through step().
+    const granted = runLaunchCycles(JUMP_STREAK_GOAL);
+    expect(granted.stats.bonusJumps).toBe(1);
+    expect(granted.stats.streak).toBe(0);
+    const rebuilt = runLaunchCycles(JUMP_STREAK_GOAL - 1, granted.stats);
+    expect(rebuilt.stats.bonusJumps).toBe(1);
+    expect(rebuilt.stats.streak).toBe(JUMP_STREAK_GOAL - 1);
 
     // Spend: the carried state (stats intact, clowns replaced — §3.5 precedent)
-    // meets a middle-third death; the SAME jump the fold earned is consumed.
+    // meets a middle-third death; the earned jump is consumed and the streak dies.
     const spent = step(
-      { ...earned.state, clowns: [flying(400, LANDING_Y, 0, 0), seatedLeft(370)] },
+      playing({
+        balloons: [],
+        clowns: [flying(400, LANDING_Y, 0, 0), seatedLeft(370)],
+        stats: rebuilt.stats,
+      }),
       [],
       createRng(7),
       consequences,
@@ -271,6 +306,7 @@ describe('bonusJumps consumption through step/advance (spec §3.3 decision A)', 
     expect(eventTypes(spent.events)).toEqual(['death']);
     expect(spent.state.stats.bonusJumps).toBe(0); // the earned jump is gone
     expect(spent.state.stats.lives).toBe(3); // and no life was taken
+    expect(spent.state.stats.streak).toBe(0); // death reset in the Option-A branch
   });
 
   it('fold order: two deaths in one tick spend per-event — two jumps absorb both, one does not', () => {
@@ -305,7 +341,7 @@ describe('bonusJumps consumption through step/advance (spec §3.3 decision A)', 
 // to step result — each segment's state is a spread of the previous one with
 // only the clowns replaced (kernel purity, tick-order precedent).
 describe('spec §3.5 scripted end-to-end scenario (headless)', () => {
-  it('levels up at 3 lives (+1), spends the earned jump on the first death, then four lethal deaths end the game', () => {
+  it('levels up at 3 lives (+1), then four lethal deaths end the game — every crash also resets the launch streak (#24)', () => {
     const rng = createRng(2026);
     const run = (state: GameState) => step(state, [], rng, consequences);
 
@@ -315,7 +351,8 @@ describe('spec §3.5 scripted end-to-end scenario (headless)', () => {
     // (i) 55/56 pre-popped; the LAST blue balloon sits on the flying clown's
     // post-integration position (construction of the tick-order level probe):
     // one tick = pop + blue row clear + level-completed + edge landing +
-    // chain launch. Score earns pop and row bonus; a life is gained.
+    // chain launch. Score earns pop and row bonus (no jump since #24); a life
+    // is gained; the chain launch opens the streak at 1.
     const i = run({
       ...start,
       balloons: gridWithLastAt('0-0', 440, LANDING_Y + GRAVITY),
@@ -323,59 +360,160 @@ describe('spec §3.5 scripted end-to-end scenario (headless)', () => {
     });
     expect(eventTypes(i.events)).toEqual(['balloon-popped', 'row-cleared', 'level-completed', 'landed-edge', 'launched']);
     expect(i.state.stats.score).toBe(getBalloonScore('blue') + getRowBonus('blue') + 10); // 1110
-    expect(i.state.stats.bonusJumps).toBe(1); // blue row clear earned it
+    expect(i.state.stats.bonusJumps).toBe(0); // #24: blue rows grant points only
+    expect(i.state.stats.streak).toBe(1); // the combined tick's chain launch
     expect(i.state.stats.lives).toBe(4); // 3 + 1
     expect(i.state.level).toBe(2);
     expect(i.state.balloons).toHaveLength(56);
     expect(i.state.balloons.every((b) => !b.popped)).toBe(true);
     expect(i.state.phase).toBe('playing');
 
-    // (ii) five death segments — middle (jump-absorbed), occupied-edge,
-    // fall-off, middle, middle again — carrying score/bonusJumps/level
-    // forward through real steps. Balloons (fresh grid, y ≤ 180) are never
-    // near the constructed descent paths, so no pops interfere.
+    // (ii) four death segments — middle, occupied-edge, fall-off, middle —
+    // carrying score/bonusJumps/level/streak forward through real steps. No
+    // jump was ever earned (#24), so every death is lethal; each also resets
+    // the streak to 0. Balloons (fresh grid, y ≤ 180) are never near the
+    // constructed descent paths, so no pops interfere.
 
-    // Segment 1: middle third under the default seesaw (x = 400) — the death
-    // SPENDS the segment-(i) bonus jump instead of a life (§3.3 decision A).
+    // Segment 1: middle third under the default seesaw (x = 400) — lethal at
+    // jumps 0; the segment-(i) streak of 1 dies with the crash (#24 reset).
     const d1 = run({ ...i.state, clowns: [flying(400, LANDING_Y, 0, 0), seatedLeft(370)] });
     expect(eventTypes(d1.events)).toEqual(['death']);
-    expect(d1.state.stats.lives).toBe(4); // jump spent, life kept
-    expect(d1.state.stats.bonusJumps).toBe(0); // the earned jump is gone
+    expect(d1.state.stats.lives).toBe(3); // 4 − 1: nothing absorbs it anymore
+    expect(d1.state.stats.bonusJumps).toBe(0);
+    expect(d1.state.stats.streak).toBe(0); // the death reset
     expect(d1.state.currentJumpVelocity).toBe(INITIAL_JUMP_VELOCITY); // reset from −14.2
 
-    // Segment 2: left edge occupied by the seated clown — no jump left, so
-    // the 2025 rule applies.
+    // Segment 2: left edge occupied by the seated clown.
     const d2 = run({ ...d1.state, clowns: [seatedLeft(370), flying(380, LANDING_Y, 0, 0)] });
     expect(eventTypes(d2.events)).toEqual(['death']);
     expect(d2.events[0].type === 'death' && d2.events[0].cause).toBe('occupied-edge');
-    expect(d2.state.stats.lives).toBe(3);
+    expect(d2.state.stats.lives).toBe(2);
+    expect(d2.state.stats.streak).toBe(0);
     expect(d2.state.currentJumpVelocity).toBe(INITIAL_JUMP_VELOCITY);
 
     // Segment 3: fall-off past the death line (x = 200 misses the seesaw).
     const d3 = run({ ...d2.state, clowns: [seatedLeft(370), flying(200, 650, 0, 0)] });
     expect(eventTypes(d3.events)).toEqual(['death']);
     expect(d3.events[0].type === 'death' && d3.events[0].cause).toBe('fall-off');
-    expect(d3.state.stats.lives).toBe(2);
+    expect(d3.state.stats.lives).toBe(1);
+    expect(d3.state.stats.streak).toBe(0);
     expect(d3.state.currentJumpVelocity).toBe(INITIAL_JUMP_VELOCITY);
 
-    // Segment 4: another middle-third death — lethal at jumps 0, but one life
-    // remains, so NO game-over fires yet (the d1 consumption bought a tick).
-    const d4 = run({ ...d3.state, clowns: [flying(400, LANDING_Y, 0, 0), seatedLeft(370)] });
-    expect(eventTypes(d4.events)).toEqual(['death']); // no game-over event
-    expect(d4.state.stats.lives).toBe(1);
-    expect(d4.state.phase).toBe('playing');
-
-    // (iii) Final tick: the fifth death reaches 0 lives and the kernel's
+    // (iii) Final tick: the fourth death reaches 0 lives and the kernel's
     // once-guard transitions the phase with 'game-over' emitted LAST.
-    const d5 = run({ ...d4.state, clowns: [flying(400, LANDING_Y, 0, 0), seatedLeft(370)] });
-    expect(eventTypes(d5.events)).toEqual(['death', 'game-over']); // game-over last in the tick
-    expect(d5.events[0].type === 'death' && d5.events[0].cause).toBe('middle');
-    expect(d5.state.stats.lives).toBe(0);
-    expect(d5.state.phase).toBe('gameover');
-    // Carried through all five deaths: score and level from segment (i); the
-    // earned jump was spent at d1 (§3.3 consumption, issue #8).
-    expect(d5.state.stats.score).toBe(getBalloonScore('blue') + getRowBonus('blue') + 10);
-    expect(d5.state.stats.bonusJumps).toBe(0);
-    expect(d5.state.level).toBe(2);
+    const d4 = run({ ...d3.state, clowns: [flying(400, LANDING_Y, 0, 0), seatedLeft(370)] });
+    expect(eventTypes(d4.events)).toEqual(['death', 'game-over']); // game-over last in the tick
+    expect(d4.events[0].type === 'death' && d4.events[0].cause).toBe('middle');
+    expect(d4.state.stats.lives).toBe(0);
+    expect(d4.state.phase).toBe('gameover');
+    // Carried through all four deaths: score and level from segment (i); the
+    // streak never survived a crash (§3.3 v2, issue #24).
+    expect(d4.state.stats.score).toBe(getBalloonScore('blue') + getRowBonus('blue') + 10);
+    expect(d4.state.stats.bonusJumps).toBe(0);
+    expect(d4.state.stats.streak).toBe(0);
+    expect(d4.state.level).toBe(2);
+  });
+});
+
+// Issue #24 (spec §3.3 v2 earning): the launch streak THROUGH the kernel —
+// step()/advance() with createConsequences(), never a reimplementation. The
+// streak counts completed launch cycles (chain launches: safe edge landing
+// that chain-launches the other seated clown); input launches never count;
+// any death resets; level-completed does not.
+describe('launch streak v2 through step/advance (issue #24)', () => {
+  it('grants +1 jump and resets the streak at 25 chain launches (AC-1)', () => {
+    const at24 = runLaunchCycles(JUMP_STREAK_GOAL - 1);
+    expect(at24.lastEvents.map((e) => e.type)).toEqual(['landed-edge', 'launched']);
+    expect(at24.stats).toEqual({
+      score: (JUMP_STREAK_GOAL - 1) * EDGE_LANDING_BONUS,
+      lives: 3,
+      bonusJumps: 0,
+      streak: JUMP_STREAK_GOAL - 1,
+    });
+
+    const at25 = runLaunchCycles(1, at24.stats);
+    expect(at25.lastEvents.map((e) => e.type)).toEqual(['landed-edge', 'launched']);
+    expect(at25.stats.bonusJumps).toBe(1); // granted
+    expect(at25.stats.streak).toBe(0); // reset at the goal, ready for the next run
+  });
+
+  it('a death after 24 cycles resets the streak and takes a life — no jump (Option-A branch 2)', () => {
+    const built = runLaunchCycles(JUMP_STREAK_GOAL - 1);
+    const died = step(
+      playing({
+        balloons: [],
+        clowns: [flying(400, LANDING_Y, 0, 0), seatedLeft(370)],
+        stats: built.stats, // streak 24, jumps 0
+      }),
+      [],
+      createRng(7),
+      consequences,
+    );
+    expect(eventTypes(died.events)).toEqual(['death']);
+    expect(died.state.stats.streak).toBe(0); // reset
+    expect(died.state.stats.bonusJumps).toBe(0); // no jump was ever granted
+    expect(died.state.stats.lives).toBe(2); // 3 − 1: the old lethal rule
+  });
+
+  it('a death with a jump to consume ALSO resets the streak (Option-A branch 1)', () => {
+    // 25 cycles grant a jump; 24 more rebuild the live streak at 24; the
+    // death then spends the jump AND kills the streak.
+    const granted = runLaunchCycles(JUMP_STREAK_GOAL);
+    const built = runLaunchCycles(JUMP_STREAK_GOAL - 1, granted.stats);
+    const died = step(
+      playing({
+        balloons: [],
+        clowns: [flying(400, LANDING_Y, 0, 0), seatedLeft(370)],
+        stats: built.stats, // streak 24, jumps 1
+      }),
+      [],
+      createRng(7),
+      consequences,
+    );
+    expect(eventTypes(died.events)).toEqual(['death']);
+    expect(died.state.stats.bonusJumps).toBe(0); // spent (unchanged Option-A consumption)
+    expect(died.state.stats.lives).toBe(3); // untouched
+    expect(died.state.stats.streak).toBe(0); // reset in BOTH Option-A branches (#24)
+  });
+
+  it('input launches never count toward the streak (AC-3)', () => {
+    const { state, events } = step(playing({ balloons: [] }), [{ type: 'launch' }], createRng(3), consequences);
+    const launched = events[0];
+    expect(eventTypes(events)).toEqual(['launched']);
+    expect(launched.type === 'launched' && launched.via).toBe('input');
+    expect(state.stats.streak).toBe(0);
+  });
+
+  it('live-path emission-order pin: landed-edge + launched{chain} in one real tick → streak +1', () => {
+    const { state, events } = step(
+      playing({ balloons: [], clowns: [flying(440, LANDING_Y, 0, 0), seatedLeft(370)] }),
+      [],
+      createRng(11),
+      consequences,
+    );
+    expect(eventTypes(events)).toEqual(['landed-edge', 'launched']);
+    expect(state.stats.streak).toBe(1);
+  });
+
+  it('level-completed does not reset a live streak (a deathless rally spans levels)', () => {
+    // 24 cycles build streak 24; the next real tick completes the level (the
+    // seesaw is parked away so no landing/chain follows) — the streak must
+    // survive the level-up untouched.
+    const built = runLaunchCycles(JUMP_STREAK_GOAL - 1);
+    const leveled = step(
+      playing({
+        balloons: gridWithLastAt('0-0', 440, LANDING_Y + GRAVITY),
+        clowns: [flying(440, LANDING_Y, 0, 0), seatedLeft(370)],
+        seesaw: movedSeesaw(100),
+        stats: built.stats,
+      }),
+      [],
+      createRng(1),
+      consequences,
+    );
+    expect(eventTypes(leveled.events)).toEqual(['balloon-popped', 'row-cleared', 'level-completed']);
+    expect(leveled.state.level).toBe(2); // kernel, same tick
+    expect(leveled.state.stats.lives).toBe(4); // 3 + LIVES_ON_LEVEL_UP
+    expect(leveled.state.stats.streak).toBe(JUMP_STREAK_GOAL - 1); // intact — level-up is not a reset
   });
 });
