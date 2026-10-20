@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { LANDING_Y, RANDOM_HEIGHT_START_LEVEL } from '../constants';
+import { GRAVITY, LANDING_Y, RANDOM_HEIGHT_START_LEVEL } from '../constants';
 import type { GameEvent } from '../events';
 import { step } from '../engine';
 import { createRng } from '../rng';
-import { createInitialState } from '../state';
-import type { Clown, GameInput, GameState, Rng } from '../types';
+import { createBalloonGrid, createInitialState } from '../state';
+import type { Balloon, Clown, GameInput, GameState, Rng } from '../types';
 
 // Issue #20 (owner decision 2026-10-19): from level 4 the entering clown takes
 // the high or low board of the free side, 50/50 via ONE seeded rng.next() draw
@@ -81,7 +81,8 @@ const countingRng = (seed: number): { rng: Rng; draws: () => number } => {
 describe('random entry-board height (issue #20, spec §3.4)', () => {
   it('below the start level: always the HIGH board of the free side, zero RNG draws', () => {
     const below = RANDOM_HEIGHT_START_LEVEL - 1; // level 3
-    const seeds = [3, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43];
+    // 22 distinct seeds × both seat sides = 44 forced deaths (DoD: ≥ 20 seeds).
+    const seeds = [3, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89];
     for (const seed of seeds) {
       for (const seatSide of ['left', 'right'] as const) {
         const { rng, draws } = countingRng(seed);
@@ -136,6 +137,48 @@ describe('random entry-board height (issue #20, spec §3.4)', () => {
       }
       expect([...seen].sort()).toEqual(pair); // both heights occur, only within the pair
     }
+  });
+
+  it('pins the same-tick level-up read: a death on the tick the level completes to 4 uses the NEW rule (one draw)', () => {
+    // Owner-decided implementation read (issue #20 brief, rule 1): the death
+    // sites read the LIVE level local, post-step-5 — so a level-up resolved
+    // earlier in the SAME tick counts. Level 3 at tick start; the dying clown
+    // pops the LAST balloon at its own post-integration position (step 4),
+    // the level completes to 4 (step 5), the middle-third death resolves
+    // (step 6) — the #20 draw must fire on this very tick. Reading the
+    // tick-start level instead would draw nothing and respawn on the high
+    // board, so the draw-count assertion discriminates the two reads.
+    const balloons: Balloon[] = createBalloonGrid().map((b) =>
+      b.id === '0-0' ? { ...b, x: 400, y: LANDING_Y + GRAVITY } : { ...b, popped: true },
+    );
+    for (const seatSide of ['left', 'right'] as const) {
+      const { rng, draws } = countingRng(11);
+      const { state, events } = step(
+        playing({
+          level: 3,
+          balloons,
+          clowns:
+            seatSide === 'left'
+              ? [flying(400, LANDING_Y, 0, 0), seated('left', 370)]
+              : [seated('right', 430), flying(400, LANDING_Y, 0, 0)],
+        }),
+        [],
+        rng,
+      );
+
+      expect(events.map((e) => e.type)).toEqual(['balloon-popped', 'row-cleared', 'level-completed', 'death']);
+      expect(state.level).toBe(4); // the level-up landed inside this same tick
+      expect(draws()).toBe(1); // NEW rule: the entry draw consumed a stream position
+    }
+
+    // Contrast, same seed: the identical death WITHOUT the same-tick level-up
+    // (balloons empty, level stays 3) draws nothing and takes the HIGH board.
+    const { rng: noLevelUpRng, draws: noLevelUpDraws } = countingRng(11);
+    const noLevelUp = die(3, 'left', noLevelUpRng);
+    expect(countDeaths(noLevelUp.events)).toBe(1);
+    expect(noLevelUp.state.level).toBe(3);
+    expect(noLevelUp.state.clowns.find((c) => c.isOnDivingBoard)?.divingBoardIndex).toBe(2);
+    expect(noLevelUpDraws()).toBe(0);
   });
 
   it('is deterministic at level ≥ 4: same seed + inputs → identical final state and events (spec §6.2 pattern)', () => {
