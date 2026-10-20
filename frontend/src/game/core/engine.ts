@@ -17,7 +17,8 @@ import {
   LANDING_Y,
   MAX_JUMP_VELOCITY,
   MAX_TICKS_PER_ADVANCE,
-  RESPAWN_BOARD_HEIGHT_INDEX,
+  RANDOM_HEIGHT_PROBABILITY,
+  RANDOM_HEIGHT_START_LEVEL,
   SEAT_OFFSET,
   SEESAW_CLAMP_MAX,
   SEESAW_CLAMP_MIN,
@@ -56,11 +57,20 @@ const freeSideOf = (side: 'left' | 'right'): 'left' | 'right' => (side === 'left
 // Entering clowns take the free end of the seesaw (owner decisions
 // 2026-10-18 issue #6 comment 6252402875 and 2026-10-19 issue #19): the side
 // pair comes from seatedFreeSide — opposite the currently seated clown — for
-// ALL three death causes. The height within the pair is the still-open owner
-// decision (interim: high board). 'left' pair is boards 0/1, 'right' is 2/3.
-const respawnBoardIndex = (enteringSide: 'left' | 'right'): 0 | 1 | 2 | 3 =>
+// ALL three death causes. The height within the pair comes from
+// drawEntryHeightIndex (issue #20). 'left' pair is boards 0/1, 'right' is 2/3.
+const respawnBoardIndex = (enteringSide: 'left' | 'right', heightIndex: 0 | 1): 0 | 1 | 2 | 3 =>
   // base ∈ {0, 2} + height ∈ {0, 1} ⊆ {0, 1, 2, 3} — cast only narrows arithmetic.
-  ((enteringSide === 'left' ? 0 : 2) + RESPAWN_BOARD_HEIGHT_INDEX) as 0 | 1 | 2 | 3;
+  ((enteringSide === 'left' ? 0 : 2) + heightIndex) as 0 | 1 | 2 | 3;
+
+// Issue #20 (owner decision 2026-10-19): entry-board height. 0 = high board
+// (y=250), 1 = low board (y=350) — the encoding the removed
+// RESPAWN_BOARD_HEIGHT_INDEX constant used. From level 4: exactly ONE
+// rng.next() per qualifying entry, 50/50 (the same stream as the launch vx,
+// drawn at the death site before step 7). Below level 4: always 0 (high, the
+// 2025 default) and NO draw — the stream stays byte-identical to pre-#20.
+const drawEntryHeightIndex = (level: number, rng: Rng): 0 | 1 =>
+  level >= RANDOM_HEIGHT_START_LEVEL ? (rng.next() < RANDOM_HEIGHT_PROBABILITY ? 0 : 1) : 0;
 
 // Owner decision 2026-10-19 (issue #19): ALL three death causes enter on the
 // FREE end — opposite the currently seated clown (receiver's perspective),
@@ -251,7 +261,7 @@ export function step(
             // the dying clown's stale seesawSide (the old bug pointed the
             // entrant back at the occupied side).
             currentJumpVelocity = INITIAL_JUMP_VELOCITY;
-            clowns[i] = createBoardClown(respawnBoardIndex(seatedFreeSide(clowns)));
+            clowns[i] = createBoardClown(respawnBoardIndex(seatedFreeSide(clowns), drawEntryHeightIndex(level, rng)));
             events.push({ type: 'death', clownIndex: i as 0 | 1, cause: 'occupied-edge' });
           } else {
             // Safe edge landing: snap to the seat, strengthen the jump velocity
@@ -275,7 +285,7 @@ export function step(
           // read live (a same-tick lower-index safe landing counts as the
           // receiver; the dying clown itself is flying, never a match).
           currentJumpVelocity = INITIAL_JUMP_VELOCITY;
-          clowns[i] = createBoardClown(respawnBoardIndex(seatedFreeSide(clowns)));
+          clowns[i] = createBoardClown(respawnBoardIndex(seatedFreeSide(clowns), drawEntryHeightIndex(level, rng)));
           events.push({ type: 'death', clownIndex: i as 0 | 1, cause: 'middle' });
         }
         landedOrDied = true;
@@ -288,7 +298,7 @@ export function step(
     // always-right hardcode at baseline :340; spec §3.4 primacy).
     if (!landedOrDied && clown.y > FALL_OFF_Y) {
       currentJumpVelocity = INITIAL_JUMP_VELOCITY;
-      clowns[i] = createBoardClown(respawnBoardIndex(seatedFreeSide(clowns)));
+      clowns[i] = createBoardClown(respawnBoardIndex(seatedFreeSide(clowns), drawEntryHeightIndex(level, rng)));
       events.push({ type: 'death', clownIndex: i as 0 | 1, cause: 'fall-off' });
     }
   }

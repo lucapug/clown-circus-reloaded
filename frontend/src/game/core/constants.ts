@@ -65,13 +65,16 @@ export const JUMP_VELOCITY_STEP = 0.2;
 export const BOARD_LAUNCH_VY = 2;
 export const BOARD_LAUNCH_VX = 3;
 
-// TODO(owner): high vs low entry trampoline — undecided (issue #6, owner
-// comment 6252402875, 2026-10-18). Interim default: the HIGH board (y=250),
-// matching the 2025 implementation, isolated here so the decision is a
-// one-line change. 0 = high board (y=250), 1 = low board (y=350). The entry
-// SIDE is always the free end of the seesaw (see engine.ts) and is not
-// affected by this constant.
-export const RESPAWN_BOARD_HEIGHT_INDEX: 0 | 1 = 0;
+// Random entry-board height (owner decision 2026-10-19, issue #20 — resolves
+// the TODO(owner) of issue #6 comment 6252402875): from level 4 a death
+// respawns the entering clown on the high or low board of the free side,
+// 50/50 via exactly one seeded rng.next() draw (engine.ts drawEntryHeightIndex);
+// below the start level the entrant always takes the HIGH board (y=250), the
+// 2025 default, with NO draw. 0 = high board (y=250), 1 = low board (y=350).
+// The entry SIDE is always the free end of the seesaw (see engine.ts) and is
+// not affected by this decision.
+export const RANDOM_HEIGHT_START_LEVEL = 4;
+export const RANDOM_HEIGHT_PROBABILITY = 0.5;
 
 // Level scaling of horizontal launch velocity.
 export const LEVEL_MULT_STEP = 0.25;
