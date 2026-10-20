@@ -92,7 +92,7 @@ Row clear = all 14 balloons of that row popped (checked when any balloon pops). 
 - **In flight:** gravity applies; wall bounce reverses vx with 0.8 damping (x clamped at 24 / 776); falling onto a diving board bounces with 0.9 damping (only when vy > 0).
 - **Balloon collision:** center distance < 40 (24 + 16) pops the balloon.
 - **Seesaw landing** (falling clown at y ≥ 496): outer thirds of the seesaw are safe edges; middle third is death; landing on an edge already occupied by the other clown is death. Safe edge landing: +10 points, jump velocity strengthens (−0.2, clamped at −17), and the other seated clown is launched immediately.
-- **Deaths** (each: lives −1, jump velocity resets to −14, "SPLAT!" text, dying clown respawns on a diving board on the free side): middle landing; occupied-edge landing; falling below y = 650.
+- **Deaths** (each: lives −1, jump velocity resets to −14, "SPLAT!" text, dying clown respawns on a diving board on the free side): middle landing; occupied-edge landing; falling below y = 650. From level 4, the entering clown takes the high or low board of the free side, 50/50 via the seeded RNG (one draw per entry, same stream as launch vx — seeded runs containing level ≥ 4 entries differ from pre-#20 recordings); before level 4, always the high board.
 - **Seesaw tilt:** one seated clown tilts to their side; otherwise level. Seesaw-follow moves seated clowns with it (±width/4).
 
 ### 3.5 Lives, levels, game state
