@@ -65,8 +65,17 @@ export const createGameDebugApi = (refs: GameDebugRefs): GameDebugApi => ({
   // #30 additive surface — never reshapes the original four above.
   exportSession: () => refs.recorder?.()?.export() ?? null,
   downloadSession: () => {
-    const session = refs.recorder?.()?.export();
-    return session ? downloadSession(session) : null;
+    // Issue #33: the live recorder is null until useGameLoop.start() and on
+    // every reload — fall back to the newest FINALIZED ring session before
+    // giving up, and never give up silently.
+    const live = refs.recorder?.()?.export();
+    const ring = readSessions();
+    const session = live ?? ring[ring.length - 1] ?? null;
+    if (!session) {
+      console.info('[__game] no session yet — start a game first; finalized traces: __game.sessions()');
+      return null;
+    }
+    return downloadSession(session);
   },
   sessions: () => readSessions(),
   replaySession: (session) => runReplay(session),

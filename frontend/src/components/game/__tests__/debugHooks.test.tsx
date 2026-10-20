@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import {
   TICK_DURATION,
@@ -9,8 +9,10 @@ import {
   createRng,
   type Simulation,
 } from '../../../game/core';
-import { createGameDebugApi, installDebugHooks } from '../../../game/debugHooks';
+import { createGameDebugApi, installDebugHooks, type GameDebugRefs } from '../../../game/debugHooks';
 import { GameHUD } from '../GameHUD';
+import { SESSIONS_KEY, type JsonSession } from '../../../game/recorder/types';
+import type { SessionRecorder } from '../../../game/recorder/sessionRecorder';
 
 // Issue #9 DoD (f): the DEV-gated window.__game surface, exercised exactly
 // the way useGameLoop installs it (same createGameDebugApi + installer), in
@@ -18,7 +20,7 @@ import { GameHUD } from '../GameHUD';
 
 afterEach(cleanup);
 
-const rig = (seed = 7) => {
+const rig = (seed = 7, recorder?: GameDebugRefs['recorder']) => {
   const sim: Simulation = { state: { ...createInitialState(), phase: 'playing' }, accumulator: 0 };
   let rng = createRng(seed);
   const api = createGameDebugApi({
@@ -32,6 +34,7 @@ const rig = (seed = 7) => {
       sim.accumulator = 0;
       rng = createRng(s ?? seed);
     },
+    recorder,
   });
   installDebugHooks(api);
   return { sim, api };
@@ -132,5 +135,73 @@ describe('window.__game debug hooks (issue #9 DoD f)', () => {
   it('the jsdom environment is real (sanity: a component renders alongside)', () => {
     render(<GameHUD score={7} lives={3} bonusJumps={1} />);
     expect(screen.getByTestId('hud-score').textContent).toBe('000007');
+  });
+});
+
+// Issue #33: downloadSession must fall back to the newest FINALIZED ring
+// session when no live recorder exists, and never give up silently.
+describe('downloadSession ring fallback (issue #33)', () => {
+  const createObjectURL = vi.fn<(blob: Blob) => string>(() => 'blob:mock-url');
+  const revokeObjectURL = vi.fn<(url: string) => void>(() => {});
+  const realCreateObjectURL = URL.createObjectURL;
+  const realRevokeObjectURL = URL.revokeObjectURL;
+  let clickedDownload: string | null = null;
+  let infoSpy: ReturnType<typeof vi.spyOn>;
+
+  const ringSession = (sessionId: string): JsonSession => ({
+    format: 'clown-session',
+    formatVersion: 1,
+    header: { sessionId, startedAt: '2026-10-20T00:00:00.000Z', appGitSha: 'sha', seed: 7 },
+    inputs: [],
+    events: [],
+    snapshots: [],
+    markers: [],
+    terminal: null,
+  });
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    localStorage.clear();
+    URL.createObjectURL = createObjectURL as unknown as typeof URL.createObjectURL;
+    URL.revokeObjectURL = revokeObjectURL as unknown as typeof URL.revokeObjectURL;
+    createObjectURL.mockClear();
+    revokeObjectURL.mockClear();
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      clickedDownload = this.download;
+    });
+    infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    URL.createObjectURL = realCreateObjectURL;
+    URL.revokeObjectURL = realRevokeObjectURL;
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+    clickedDownload = null;
+  });
+
+  it('downloads the newest finalized ring session when the live recorder is null', () => {
+    rig(7, () => null);
+    localStorage.setItem(SESSIONS_KEY, JSON.stringify([ringSession('old-1'), ringSession('new-2')]));
+    expect(window.__game!.downloadSession()).toBe('clown-session-new-2.json');
+    expect(clickedDownload).toBe('clown-session-new-2.json');
+    expect(infoSpy).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(10_000); // drain the deferred revocation
+  });
+
+  it('prefers the live recorder export over the ring', () => {
+    const live = ringSession('live-3');
+    rig(7, () => ({ export: () => live }) as SessionRecorder);
+    localStorage.setItem(SESSIONS_KEY, JSON.stringify([ringSession('old-1')]));
+    expect(window.__game!.downloadSession()).toBe('clown-session-live-3.json');
+    vi.advanceTimersByTime(10_000);
+  });
+
+  it('logs an info and returns null (no throw) when nothing exists anywhere', () => {
+    rig(7, () => null);
+    expect(() => window.__game!.downloadSession()).not.toThrow();
+    expect(window.__game!.downloadSession()).toBeNull();
+    expect(infoSpy).toHaveBeenCalledTimes(2);
+    expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('no session yet'));
   });
 });
