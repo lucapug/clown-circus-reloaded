@@ -22,7 +22,7 @@ graph TD
         I10["#10 Services + mocks + offline queue ✅ merged"]
         I11["#11 Synthesized audio ✅ merged"]
         I19["#19 Free-side unification ✅ merged"]
-        I20["#20 Entry-height randomization (level 4, 50/50) — CONDITIONAL"]
+        I20["#20 Entry-height randomization (level 4, 50/50) ✅ merged"]
         I24["#24 Jump earning v2: 25-launch streak — CONDITIONAL"]
         I27["#27 Lives floor at 0 ✅ merged"]
     end
