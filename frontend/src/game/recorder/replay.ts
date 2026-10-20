@@ -1,7 +1,7 @@
 import { createConsequences, createInitialState, createRng, step } from '../core';
 import type { GameInput, GameState } from '../core';
 import { projectSnapshot } from './snapshot';
-import type { JsonSession, ReplayResult, SnapshotDigest } from './types';
+import type { JsonSession, ReplayResult } from './types';
 
 // Deterministic replay (issue #30): header.seed + recorded inputs through
 // the UNTOUCHED core barrel, compared by exact deep equality of projected
