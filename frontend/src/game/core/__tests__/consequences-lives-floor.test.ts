@@ -17,18 +17,19 @@ import {
   WALL_X_MIN,
 } from '../constants';
 import { createConsequences } from '../consequences';
-import type { GameEvent } from '../events';
 import { advance, step } from '../engine';
 import { createRng } from '../rng';
 import { createInitialState } from '../state';
 import type { Clown, ConsequenceReducer, GameInput, GameState } from '../types';
 
-// Issue #27 regression (fuzz-minimized, seed 22): two clowns dying in the SAME
-// tick used to fold two life decrements with no floor → lives −1 at lives 1.
-// The spec (§3.5) never contemplates negative lives: game-over fires at 0, and
-// the state must hold exactly that. The slim harness below is the extracted
-// minimized repro (round-2 fuzz investigation; the heavy 300-game harness was
-// deliberately kept out of CI).
+// Issue #27 regression: two clowns dying in the SAME tick used to fold two
+// life decrements with no floor → lives −1 at lives 1. The spec (§3.5) never
+// contemplates negative lives: game-over fires at 0, and the state must hold
+// exactly that (pinned by the state-injected property test below). The slim
+// fuzz harness (round-2 fuzz investigation; the heavy 300-game harness was
+// deliberately kept out of CI) now carries the issue #35 invariant: under the
+// spam-launch policy, input launches only fire diving-board clowns and at
+// most one clown flies at any tick (spec §3.4).
 const consequences = createConsequences();
 
 const clampX = (x: number): number => Math.max(60, Math.min(740, x));
@@ -130,29 +131,38 @@ const reproStart = (): GameState => ({
 });
 
 describe('issue #27: lives never go below zero on a same-tick double death', () => {
-  it('minimized repro (seed 22): double launch → double death → lives 0, gameover, one game-over event', () => {
-    const seed = 22;
-    const rng = createRng(seed);
-    const policyRng = createRng((seed ^ 0x5f3759df) >>> 0); // same policy stream as the investigation
-    const policy = makePolicy(policyRng);
-    const sim = { state: reproStart(), accumulator: 0 };
-    const gameoverEvents: GameEvent[] = [];
-    const negativeTicks: number[] = [];
-    let tick = 0;
+  it('invariant (issue #35): input launches only board clowns and at most one clown flies, per tick (20 seeds)', () => {
+    // Same harness as the old seed-22 repro (both streams, the doubleLaunchProb
+    // spam-launch policy) — but post-#35 the spam can no longer force seated
+    // launches: every input launch must name a clown that was isOnDivingBoard
+    // in that tick's pre-step state, and at most one clown may be flying at
+    // any tick (spec §3.4 corollary; two-flying state stays reachable only via
+    // direct state injection — see the property test below).
+    for (let seed = 1; seed <= 20; seed++) {
+      const rng = createRng(seed);
+      const policyRng = createRng((seed ^ 0x5f3759df) >>> 0); // same policy stream as the investigation
+      const policy = makePolicy(policyRng);
+      const sim = { state: reproStart(), accumulator: 0 };
+      let inputLaunches = 0;
+      let tick = 0;
 
-    while (sim.state.phase === 'playing' && tick < 30_000) {
-      const inputs = buildInputs(policy, sim.state, policyRng);
-      const res = advance(sim, TICK_DURATION, rng, consequences, inputs);
-      tick += res.ticks;
-      gameoverEvents.push(...res.events.filter((e) => e.type === 'game-over'));
-      if (sim.state.stats.lives < 0) negativeTicks.push(tick);
+      while (sim.state.phase === 'playing' && tick < 10_000) {
+        const inputs = buildInputs(policy, sim.state, policyRng);
+        const before = sim.state;
+        const res = advance(sim, TICK_DURATION, rng, consequences, inputs);
+        tick += res.ticks;
+
+        expect(sim.state.clowns.filter((c) => c.isFlying).length).toBeLessThanOrEqual(1);
+        for (const event of res.events) {
+          if (event.type === 'launched' && event.via === 'input') {
+            inputLaunches++;
+            expect(before.clowns[event.clownIndex].isOnDivingBoard).toBe(true);
+          }
+        }
+      }
+
+      expect(inputLaunches).toBeGreaterThan(0); // non-vacuity: the policy really launches via input
     }
-
-    expect(negativeTicks).toEqual([]); // no negative lives at ANY tick
-    expect(tick).toBe(233); // the minimized death tick from the fuzz report
-    expect(sim.state.phase).toBe('gameover');
-    expect(sim.state.stats.lives).toBe(0); // was −1 before the fix
-    expect(gameoverEvents).toHaveLength(1); // the kernel's once-guard, unchanged
   });
 
   it('property: 20 seeds × double-death-at-lives-1 folds stay at 0, never negative', () => {
