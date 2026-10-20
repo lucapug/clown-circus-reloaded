@@ -1,8 +1,11 @@
 import type { Rng } from './types';
 
 // mulberry32 — a tiny, fast, seeded PRNG (~5 lines, per the brief: no new
-// dependencies). The only gameplay consumer in #6 is the seated-launch vx;
-// exactly one next() draw per seated launch (issue brief, design decision 4).
+// dependencies). Two gameplay consumers, exactly one next() draw each: the
+// seated-launch vx (issue brief, design decision 4) and — since issue #20 —
+// the entry-board height draw, one per qualifying entry at level ≥ 4
+// (engine.ts drawEntryHeightIndex; the stream position of seeded runs that
+// contain level ≥ 4 entries therefore shifts vs pre-#20 recordings, spec §6.2).
 // Submission/floating-text IDs deliberately never touch this stream (spec §6.2).
 export function createRng(seed: number): Rng {
   let a = seed >>> 0;

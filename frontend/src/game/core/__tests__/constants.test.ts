@@ -30,7 +30,8 @@ import {
   LANDING_Y,
   LEVEL_MULT_STEP,
   MAX_JUMP_VELOCITY,
-  RESPAWN_BOARD_HEIGHT_INDEX,
+  RANDOM_HEIGHT_PROBABILITY,
+  RANDOM_HEIGHT_START_LEVEL,
   SEAT_OFFSET,
   SEESAW_CLAMP_MAX,
   SEESAW_CLAMP_MIN,
@@ -119,11 +120,15 @@ describe('core constants (spec §3.1/§3.4 pinned values)', () => {
     expect(levelMultiplier(3)).toBe(1.5);
   });
 
-  it('pins the interim entry-trampoline height default (owner decision still open on the height)', () => {
-    // Only the HEIGHT default is pinned here (0 = high board, y=250). The
-    // entry SIDE is the free end of the seesaw and is asserted by the
-    // tick-order death tests, never by height.
-    expect(RESPAWN_BOARD_HEIGHT_INDEX).toBe(0);
+  it('pins the random entry-board height rule (issue #20: 50/50 from level 4, always high below)', () => {
+    // Owner decision 2026-10-19 (issue #20 — resolves the issue #6 TODO):
+    // from RANDOM_HEIGHT_START_LEVEL a death draws high/low 50/50 via one
+    // seeded rng.next(); below it the entrant always takes the HIGH board
+    // (2025 default) with no draw. 0 = high board (y=250), 1 = low board
+    // (y=350); the entry SIDE (free end) is asserted by the tick-order death
+    // tests and the entry-height suite, never by these constants.
+    expect(RANDOM_HEIGHT_START_LEVEL).toBe(4);
+    expect(RANDOM_HEIGHT_PROBABILITY).toBe(0.5);
   });
 
   it('pins the §3.3 death-consumption rate: one bonus jump spent per death (2026 design decision A)', () => {
