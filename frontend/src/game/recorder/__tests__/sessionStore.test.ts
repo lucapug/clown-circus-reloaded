@@ -69,7 +69,7 @@ describe('session ring (clown-circus:sessions:v1)', () => {
     // jsdom method lookups only see the prototype, so the quota fault is
     // injected there: reject any payload longer than the seeded ring (the
     // 4th session must not fit until the two oldest are evicted).
-    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (key: string, value: string) {
+    const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key: string, value: string) {
       if (JSON.parse(value).length > 2) throw new DOMException('quota', 'QuotaExceededError');
       return realSetItem.call(this, key, value);
     });
