@@ -10,13 +10,12 @@ import {
   LANDING_Y,
   SEAT_OFFSET,
   WALL_X_MIN,
-  levelMultiplier,
 } from '../constants';
 import type { GameEvent } from '../events';
 import { nullConsequences, step } from '../engine';
 import { createRng } from '../rng';
 import { createBalloonGrid, createInitialState } from '../state';
-import type { Balloon, Clown, ConsequenceReducer, GameState } from '../types';
+import type { Balloon, Clown, ConsequenceReducer, GameState, Rng } from '../types';
 
 // Issue #6 AC 3: the pinned §3 tick order, asserted observably. Constructed
 // states are allowed everywhere because kernel functions are pure.
@@ -218,20 +217,23 @@ describe('pinned tick order (spec §3)', () => {
     expect(low.state.seesaw.x).toBe(60);
   });
 
-  it('consumes exactly one rng draw per seated launch, in clown-array order', () => {
-    const firstDraw = createRng(123).next();
-    const probe = createRng(123);
-    probe.next();
-    const secondDraw = probe.next();
+  it('launch with no board clown is a no-op: no event, no state change, zero rng draws (issue #35, spec §3.4)', () => {
+    // Two seated clowns, none on a diving board: the 2025 seated-fallback
+    // launch is gone — a seated clown flies only via the lever/chain effect.
+    const base = createRng(123);
+    let draws = 0;
+    const counting: Rng = { next: () => { draws++; return base.next(); } };
 
-    const before = playing({ balloons: [], clowns: [seatedLeft(370), seatedRight(430)] });
-    const rng = createRng(123);
-    const { events } = step(before, [{ type: 'launch' }], rng);
-    const launched = expectEvent(events, 'launched');
-    expect(launched.clownIndex).toBe(0);
-    expect(launched.vx).toBe((firstDraw - 0.5) * 4 * levelMultiplier(1));
-    expect(launched.vy).toBe(INITIAL_JUMP_VELOCITY);
-    expect(rng.next()).toBe(secondDraw); // the stream advanced by exactly one draw
+    const before = playing({
+      balloons: [],
+      clowns: [seatedLeft(370), seatedRight(430)],
+      seesaw: { ...createInitialState().seesaw, tilt: 'center' }, // two seated → level, so the no-op changes nothing at all
+    });
+    const { state, events } = step(before, [{ type: 'launch' }], counting);
+
+    expect(events).toEqual([]);
+    expect(JSON.stringify(state)).toBe(JSON.stringify(before));
+    expect(draws).toBe(0); // the launch draws nothing from the RNG stream
   });
 
   it('launches a diving-board clown before any seated clown', () => {

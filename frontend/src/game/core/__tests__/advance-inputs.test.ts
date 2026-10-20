@@ -20,17 +20,20 @@ const launchesOf = (events: ReturnType<typeof advance>['events']) =>
   events.filter((e) => e.type === 'launched');
 
 describe('advance() optional inputs drain (issue #9 decision 2)', () => {
-  it('drains the whole queued batch at the first tick boundary (two launches in one tick)', () => {
+  it('drains the whole queued batch at the first tick boundary (second launch is a no-op, issue #35)', () => {
     const s = sim();
     const inputs: readonly GameInput[] = [{ type: 'launch' }, { type: 'launch' }];
 
     const result = advance(s, TICK_DURATION, createRng(42), undefined, inputs);
 
     expect(result.ticks).toBe(1);
-    expect(launchesOf(result.events)).toHaveLength(2); // board clown, then seated clown
+    // Exactly one launch fires (the board clown); after it leaves the board
+    // the second launch input finds no diving-board clown and is a no-op
+    // (spec §3.4: no event, no seated launch).
+    expect(launchesOf(result.events)).toHaveLength(1);
     expect(result.state.clowns[1].isFlying).toBe(true);
     expect(result.state.clowns[1].isOnDivingBoard).toBe(false);
-    expect(result.state.clowns[0].isFlying).toBe(true);
+    expect(result.state.clowns[0].isOnSeesaw).toBe(true); // seated clown untouched
   });
 
   it('drains on the FIRST executed tick only (later ticks never re-apply the batch)', () => {

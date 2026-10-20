@@ -85,8 +85,10 @@ export const runScenario = (
   return { finalState: state, events, snapshots, eventSnapshots };
 };
 
-// (a) Seed 42: diving-board clown launched at tick 10, seated clown at tick 20
-// (the RNG path), periodic move-seesaw every 7th tick.
+// (a) Seed 42: diving-board clown launched at tick 10; the tick-20 launch is
+// a no-op since issue #35 (lever-only launch, spec §3.4 — no board clown left
+// by then), so the run diverges from the pre-#35 fixture from tick 20 on.
+// Periodic move-seesaw every 7th tick.
 export const scenarioAInputs: InputsAt = (_state, tick) => {
   const inputs: GameInput[] = [];
   if (tick === 10 || tick === 20) inputs.push({ type: 'launch' });
