@@ -752,3 +752,28 @@ PM 214,263 · engineer 486,619 · QA 711,539 · reviewer 359,635 → **≈ 1.77M
 ### Next
 
 Cycle #21: #40, the M3 core (backend + persistence + TDD suite + generated-vs-committed OpenAPI match + decision C + no-customer-data rule). Then #41 (switch + live §8 verification).
+
+## 2026-10-21 — Cycle #21 (issue #40, PR #43): the leaderboard backend — biggest pass, first mini-agent rework since M2
+
+### What and why
+
+The M3 core, implemented against the #39 contract: SQLAlchemy 2.1 + psycopg 3 persistence (SQLite default, `DATABASE_URL` verbatim; DB-level UNIQUE on `submission_id`; startup `create_all`), Pydantic v2 schemas, POST /scores with the full §7 idempotency semantics, GET /leaderboard (rank, score DESC, `created_at` ASC, limit 1–100), CORS + masked startup DB line (Decision C), HealthStatus model so the generated OpenAPI carries the pinned `/health` shape. TDD red-first: commit 1 is the test suite alone, verified RED live by QA. The brief also executed the **uv 0.13.x bump** (the process.md §8 M3 candidate): Dockerfile + both CI setup-uv steps pinned to 0.13.4, lockfile regenerated under the same binary.
+
+### Outcome and independent verdicts
+
+[PR #43](https://github.com/lucapug/clown-circus-reloaded/pull/43) — 6 TDD-slice commits + 1 rework; 48 backend tests (40 new), 318 non-test lines (< the ~400 cap), `openapi.yaml` byte-untouched. Notable disclosed deviation: **Pydantic 2.14 lax mode coerces `true` → 1**, so `score` needed a `field_validator(mode="before")` boolean rejection (contract `type: integer` preserved in the generated schema). [QA VERDICT: PASS](https://github.com/lucapug/clown-circus-reloaded/pull/43#issuecomment-6314675900) — red-commit proof live; parity drift-proof executed in BOTH directions (mutate the yaml → red; mutate the route schema → red); DB-level unique constraint proved on SQLite AND live Postgres; live compose verification (isolated project, owner ports untouched) with POST/replay/rank/health; **no-customer-data verified live** (distinctive name POSTed, absent from all captured logs; no `set_attribute` in `backend/app`). [REVIEW: REQUEST_CHANGES](https://github.com/lucapug/clown-circus-reloaded/pull/43#issuecomment-6314507078) — 2 [minor]: a ruff bugbear stanza that selected NO B rules (inert config; the deviation's "B008 fires" rationale was factually wrong), and the leaderboard query inline in the route instead of `crud.py`, undisclosed. → **mini-agent trial #5** (`cde61f2`: stanza made functional via `extend-select = ["B"]` — control run proved B008 fires on exactly the two `Depends(get_db)` sites without the exemption, so it is load-bearing; query moved to `crud.list_leaderboard`, SQL byte-identical; PR-body claims corrected) → [REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/43#issuecomment-6314507078) (edited in place) + [QA (rework): PASS](https://github.com/lucapug/clown-circus-reloaded/pull/43#issuecomment-6314675900), CI 6/6. Merge pending the owner.
+
+### Measured ledger (cycle #21 — the most expensive so far)
+
+PM 275,874 · engineer **8,259,271 (largest single pass of the project)** · QA 2,409,000 + 575,275 (rework re-check) · reviewer 487,803 + 548,776 (close-out) · mini-agent 603,290 → **≈ 13.16M**. Stalls 0, escalations 0, rework 1 (mini-agent trial #5, within P1.4). The engineer pass is intrinsic: full persistence + routes + schemas + 40 tests + infra pins in one slice.
+
+### Lessons
+
+- **Config-bearing deviations need control runs**: "the config fixes X" is checkable only by reproducing X without it. The reviewer caught the inert stanza; the mini-agent's control run (B008 fires 2× without the exemption) is the proof shape worth reusing.
+- Mini-agent trial #5 (603k for a 3-file mechanical fix + body edits) sits between trial #1 (253k) and trials #3/#4 (~1M) — the fixed-cost model in P1.4's consolidation file now has five data points spanning 4×.
+- The uv lock-revision bump (3→5) has an owner-side consequence: local uv must be ≥ 0.13.x for frozen syncs (CI and Docker are pinned; Homebrew uv 0.11.28 is not). Flagged to the owner in-session; also noted by both readers independently.
+- QA's compose verification on an isolated project with port overrides kept the owner-port rule intact while still exercising the real Postgres path — the pattern for every future compose battery.
+
+### Next
+
+Owner merges PR #43 (#40 closes; M3 2/3) → cycle #22 opens on #41 (switch services + live §8 verification — the last M3 issue), then M4 (integration/E2E/CD, C2 Oct 23 EOD).

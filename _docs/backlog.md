@@ -31,8 +31,8 @@ graph TD
     end
 
     subgraph M3["M3 — Contract + backend (Oct 21–22)"]
-        I39["#39 OpenAPI contract (openapi.yaml)"]
-        I40["#40 Backend: FastAPI + SQLAlchemy + idempotent /scores + API tests (TDD)"]
+        I39["#39 OpenAPI contract (openapi.yaml) ✅ merged"]
+        I40["#40 Backend: FastAPI + SQLAlchemy + idempotent /scores + API tests (TDD) — PR #43 merge-ready"]
         I41["#41 Switch services to real backend (compose + live §8)"]
     end
 
