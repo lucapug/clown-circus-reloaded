@@ -13,7 +13,7 @@ Mission: implement **exactly** the PM implementation brief (comment on the assig
 ## Procedure
 1. `git checkout main && git pull`, then `git checkout -b feat/<n>-<slug>` (name from the brief).
 2. Implement per the brief's file tree, guardrails, and sequence. Add dependencies through package managers (npm / uv), never by hand-editing against lockfiles.
-3. **Smoke verification only** (the full Definition-of-Done battery belongs to QA, independently): run the relevant backend tests, the frontend build, and one HTTP check per service you touched. State precisely which commands you ran and their result. Do not paste the whole evidence battery.
+3. **Smoke verification only** (the full Definition-of-Done battery belongs to QA, independently): run the relevant backend tests, the frontend build, and one HTTP check per service you touched. State precisely which commands you ran and their result. Do not paste the whole evidence battery. Type-check with the REAL build gate (`npm run build` / `tsc -b`), never bare `npx tsc --noEmit` — at this repo's root tsconfig (`"files": []`) it checks nothing and a vacuous green smoke cost a full rework loop (cycle #22, PR #44).
 4. Commit in small descriptive slices (short imperative subjects, matching the existing `git log` style); push; open ONE PR with `gh pr create`: title from the brief, body with `Closes #<n>`, concise change description, resolved versions from lockfiles, smoke results, and an honest **Deviations** section (never "None" if anything was adapted).
 
 ## Anti-hang rules (mandatory)
