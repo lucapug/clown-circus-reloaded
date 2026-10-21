@@ -26,3 +26,7 @@ curl http://localhost:8000/health   # -> {"status":"ok"}
 - The `db` service uses dev-only credentials (`clown:clown`, database `clowncircus`); data persists in the `clowncircus-db` named volume.
 - Without `DATABASE_URL` set, the app defaults to a local (ephemeral inside the container) SQLite database.
 - Stop and remove everything, including the database volume: `docker compose down -v`
+
+## Local development
+
+`cd frontend && npm install && npm run dev` works with zero backend (the leaderboard mock is on in `.env.development`). To play against the live API, run the backend and point Vite at it via a gitignored `frontend/.env.development.local` with `VITE_USE_MOCK_LEADERBOARD=0` and `VITE_API_BASE_URL=http://127.0.0.1:8000` — the normative write-up lives in AGENTS.md ("Leaderboard service modes").
