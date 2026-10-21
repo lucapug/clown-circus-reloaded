@@ -20,7 +20,7 @@ def _payload() -> dict:
     }
 
 
-def test_player_name_never_reaches_otel_emit(client, monkeypatch) -> None:
+def test_player_name_never_reaches_otel_emit(client, monkeypatch, caplog) -> None:
     """Emit-spy on the LoggingHandler instance the lifespan attaches to uvicorn.error."""
     uvicorn_logger = logging.getLogger("uvicorn.error")
     handlers = [h for h in uvicorn_logger.handlers if isinstance(h, LoggingHandler)]
@@ -36,10 +36,13 @@ def test_player_name_never_reaches_otel_emit(client, monkeypatch) -> None:
 
     monkeypatch.setattr(bridge, "emit", spy)
 
-    # Provoke at least one emission so the spy is not vacuous, then submit the score.
-    assert client.get("/health").status_code == 200
-    response = client.post("/scores", json=_payload())
-    assert response.status_code == 201
+    # Raise the logger to INFO (TestClient leaves it NOTSET = effective WARNING)
+    # so INFO records flow to the bridge; without this the spy would be vacuous.
+    with caplog.at_level(logging.INFO, logger="uvicorn.error"):
+        # Provoke at least one emission, then submit the score.
+        assert client.get("/health").status_code == 200
+        response = client.post("/scores", json=_payload())
+        assert response.status_code == 201
 
     assert emitted, "LoggingHandler.emit must have been called at least once"
     for record in emitted:
@@ -47,7 +50,7 @@ def test_player_name_never_reaches_otel_emit(client, monkeypatch) -> None:
 
 
 def test_player_name_never_appears_in_any_log_record(client, caplog) -> None:
-    with caplog.at_level(logging.DEBUG):
+    with caplog.at_level(logging.DEBUG, logger="uvicorn.error"):
         response = client.post("/scores", json=_payload())
     assert response.status_code == 201
     assert PLAYER_NAME not in caplog.text

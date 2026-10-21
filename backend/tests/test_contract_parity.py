@@ -105,7 +105,8 @@ def test_generated_openapi_matches_committed_contract() -> None:
         )
 
     # 4. 422: FastAPI-native detail shape accepted for the committed ValidationError.
-    detail = g_components["HTTPValidationError"]["properties"]["detail"]
+    g_validation = _resolve_refs(g_components["HTTPValidationError"], g_components)
+    detail = g_validation["properties"]["detail"]
     assert detail["type"] == "array"
     item_props = detail["items"]["properties"]
     assert {"loc", "msg", "type", "input"} <= set(item_props)
