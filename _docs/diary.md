@@ -729,3 +729,26 @@ Engineer 810,803 · QA 1,004,985 · reviewer 308,932 → **≈ 2.12M**, 87 tool 
 ### Next
 
 M3 opens (backend + DB + contract, window Oct 21–22): issues groomed next entry; decision C (DB signal log-only), the #10 contract-alignment relay (submissionId, outcome types), and spec §7 as the behavioral contract. PR #38 awaits the owner's merge.
+
+## 2026-10-21 — M3 opens; cycle #20 (issue #39, PR #42): the OpenAPI contract lands
+
+### What and why
+
+M3 groomed as three session-sized issues (#39 contract → #40 backend → #41 switch-services; backlog map updated, critical path now `…#10 → #39 → #40 → #41` toward C2). The contract issue ran first (contract-first per plan §5 / Module 2 flow): `openapi.yaml` (OpenAPI 3.1) encoding every spec §7 pin — `ScoreSubmission{name, score, submissionId(uuid)}`, 201 documented as replay-returns-**originally-stored**, 409 no-mutation, 422 FastAPI-native detail shape, leaderboard `{entries:[{rank,name,score,date}]}` with ordering score DESC/`created_at` ASC, `limit` 1–100 default 10, `date` pinned `date-time` **with baseline parity verified at `models.py@0d365e6`** (`date: datetime`) — plus the anti-rot test (`openapi-spec-validator` in the backend dev group, `backend/tests/test_openapi_contract.py`). The contract-vs-client cross-check (the #10 relay) is in the brief's DoD: every status the client branches on (2xx/409/422/other-4xx/5xx/network) has a home in the yaml.
+
+### Outcome and independent verdicts
+
+[PR #42](https://github.com/lucapug/clown-circus-reloaded/pull/42) — 3 commits, exactly the 4 brief-allowed files. Engineer deviations disclosed and verified (quoted YAML status keys for string-keyed paths; 409 body inlined to keep the six pinned schemas; test docstring). [QA VERDICT: PASS](https://github.com/lucapug/clown-circus-reloaded/pull/42#issuecomment-6313036560) — fresh-worktree battery, spec §7 line-check, client cross-check, all deviations re-derived, **baseline parity spot-checked independently at the pinned clone**, CI 6/6. [REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/42#issuecomment-6313028347) — zero findings above [note]; positives called out: 201-replay semantics stated ON the 201 response, tie-break on the operation, property names exact. Owner merged the same morning (`3b5a8dd`); #39 closed, main CI green. **M3 1/3.**
+
+### Measured ledger (cycle #20)
+
+PM 214,263 · engineer 486,619 · QA 711,539 · reviewer 359,635 → **≈ 1.77M**, 79 tool uses. Stalls 0, escalations 0, rework 0 — fifth consecutive clean cycle. A contract-only cycle is the cheapest M-cycle type so far after docs-only #16.
+
+### Lessons
+
+- Grooming split confirmed with the owner (2026-10-21): orchestrator grooms milestone issues at milestone entry (M0 precedent; the PM role file forbids issue creation), the PM briefs each cycle — recorded here once because the owner raised it, no process change.
+- The merge-order finding from C1 got its structural answer the same day: with #38 merged, the main push-runs are green again; CD (M4) will make "main green" load-bearing, which is the durable fix for this incident class.
+
+### Next
+
+Cycle #21: #40, the M3 core (backend + persistence + TDD suite + generated-vs-committed OpenAPI match + decision C + no-customer-data rule). Then #41 (switch + live §8 verification).
