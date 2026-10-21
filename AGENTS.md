@@ -26,6 +26,8 @@ Frontend (`cd frontend`):
 - `npm run dev` — Vite dev server on http://localhost:5173
 - `npm run build` — production build into `frontend/dist/`
 
+**Leaderboard service modes (issue #41):** `VITE_USE_MOCK_LEADERBOARD=1` (set only in `frontend/.env.development`) serves the zero-backend mock — `npm run dev` works with no server; anything else uses the HTTP service. Build/preview and the Compose image default to same-origin `''` (the backend on :8000 serves the bundle). **Live dev:** run the backend (`cd backend && uv run uvicorn app.main:app` — default CORS already allows the :5173 origins) and create `frontend/.env.development.local` (gitignored) with `VITE_USE_MOCK_LEADERBOARD=0` and `VITE_API_BASE_URL=http://127.0.0.1:8000`. `vite.config.ts` has no dev proxy, so same-origin dev fetches would 404 — the explicit base URL is the supported live-dev path.
+
 Backend (`cd backend`):
 
 - `uv sync` — install backend dependencies into `backend/.venv`
