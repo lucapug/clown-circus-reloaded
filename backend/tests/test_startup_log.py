@@ -12,9 +12,10 @@ import app.main as main_module
 
 
 def test_startup_logs_masked_db_target_once(tmp_path, monkeypatch, caplog) -> None:
+    from sqlalchemy import create_engine
+
     from app import models  # noqa: F401
     from app.database import Base
-    from sqlalchemy import create_engine
 
     engine = create_engine(
         f"sqlite:///{tmp_path / 'masked.db'}",
@@ -25,9 +26,11 @@ def test_startup_logs_masked_db_target_once(tmp_path, monkeypatch, caplog) -> No
     # Stub the engine so lifespan's create_all never dials the fake Postgres host.
     monkeypatch.setattr(main_module, "get_engine", lambda *args, **kwargs: engine)
 
-    with caplog.at_level(logging.INFO, logger="uvicorn.error"):
-        with TestClient(main_module.create_app()):
-            pass
+    with (
+        caplog.at_level(logging.INFO, logger="uvicorn.error"),
+        TestClient(main_module.create_app()),
+    ):
+        pass
 
     db_lines = [
         record.getMessage()

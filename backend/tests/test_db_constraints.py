@@ -10,9 +10,9 @@ import pytest
 
 
 def _engine(tmp_path):
-    from app import models
-    from app.database import Base
     from sqlalchemy import create_engine
+
+    from app.database import Base
 
     engine = create_engine(
         f"sqlite:///{tmp_path / 'constraints.db'}",
@@ -50,10 +50,10 @@ def test_inspector_finds_unique_on_submission_id(tmp_path) -> None:
 
 def test_direct_duplicate_submission_id_raises_integrity_error(tmp_path) -> None:
     """Bypasses the API: the constraint lives in the database, not the route logic."""
+    from sqlalchemy.exc import IntegrityError
     from sqlalchemy.orm import sessionmaker
 
     from app import models
-    from sqlalchemy.exc import IntegrityError
 
     engine = _engine(tmp_path)
     session = sessionmaker(bind=engine)()

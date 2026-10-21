@@ -1,7 +1,7 @@
 """GET /leaderboard ordering, tie-break, limit, and rank tests (#40 D1)."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def _post(client, name: str, score: int) -> dict:
@@ -28,8 +28,8 @@ def test_tie_break_created_at_asc(client, test_db) -> None:
     from app import models
 
     _, factory = test_db
-    earlier = datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
-    later = datetime(2026, 1, 2, 12, 0, 0, tzinfo=timezone.utc)
+    earlier = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
+    later = datetime(2026, 1, 2, 12, 0, 0, tzinfo=UTC)
     with factory() as db:
         db.add(
             models.Score(

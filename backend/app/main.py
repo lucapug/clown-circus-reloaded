@@ -17,7 +17,9 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from opentelemetry.sdk._logs import LoggingHandler
 
+from app import models  # noqa: F401  (registers the mappings on Base.metadata)
 from app.config import database_from_env
+from app.database import Base, get_engine
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -29,6 +31,7 @@ DIST_DIR = BASE_DIR / "frontend" / "dist"
 async def lifespan(_: FastAPI):
     _, backend = database_from_env()
     logger.info("database backend: %s", backend)
+    Base.metadata.create_all(get_engine())
     handler = LoggingHandler(level=logging.INFO)
     logger.addHandler(handler)
     try:
