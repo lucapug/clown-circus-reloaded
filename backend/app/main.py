@@ -20,6 +20,7 @@ from opentelemetry.sdk._logs import LoggingHandler
 from app import models  # noqa: F401  (registers the mappings on Base.metadata)
 from app.config import database_from_env
 from app.database import Base, get_engine
+from app.routes_leaderboard import router as leaderboard_router
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -42,6 +43,7 @@ async def lifespan(_: FastAPI):
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Clown Circus Reloaded", lifespan=lifespan)
+    app.include_router(leaderboard_router)
 
     @app.get("/health")
     def health() -> dict[str, str]:
