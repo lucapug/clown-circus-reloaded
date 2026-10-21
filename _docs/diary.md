@@ -691,3 +691,41 @@ Owner merges PR #36 (#35 closes). All M2 + conditionals then complete: #9/#19/#2
 **Lezioni vive per la nuova sessione:** checkout-main-first su ogni scrittura repo; browser automation = mechanism checks only (gameplay = owner + tracce); brief-vs-spec → vince la spec; il fuzz del core deterministic è la verifica più forte disponibile (2 round, 4.17M, ha chiuso il report owner e trovato #27).
 
 **Session close 2026-10-20:** owner merged PR #32 (streak) and PR #36 (lever-only) — **M2 fully complete: 6/6 MUSTs + #19, #20, #24, #27, #30, #33 extras**. All gameplay rules 2026 decided and on `main`. Tomorrow: C1 formal check (criteria already green) then M3 (backend/DB/contract). Session handoff entry above.
+
+## 2026-10-21 — C1 formal check: PASSED with one finding fixed in-flight (merge-order interaction #32×#36)
+
+### Method
+
+The five plan-§6 criteria checked one by one against primary evidence, not memory: full local test suite; `grep` for open TODOs/open questions in `product-spec.md`; GitHub Actions runs on `main` and on the last merged PR branches; the issue tracker (18/18 issues closed, every one single-cycle); owner activity as recorded in the diary's own play-test and recorder entries.
+
+### The finding: CI red on `main` — a merge-order interaction PR-level CI cannot catch
+
+The two evening merges of 2026-10-20 (#36 lever-only at 17:08:26Z, #32 streak at 17:08:43Z — **seconds apart**) each had green CI on their own merge-refs, but the push-run on the combined `main` failed the frontend job: `consequences-live.test.ts` → `input launches never count toward the streak (AC-3)` — `expected [] to deeply equal [ 'launched' ]`. Diagnosis: the test (from #32) constructed **two seated clowns and no board clown** and sent a launch input — pre-#35 semantics. Under #35's lever-only rule that input is a correctly-specified no-op, so no `launched` event fires. **The engine is behaving as designed; the test setup was stale.** A full-suite run reproduced exactly 1 failure of 253, and a grep map of all test sites sending launch inputs confirmed every other site uses the default state's board clown (already green under #35) — the defect was one test in one file.
+
+### Fix cycle (#19 overall, issue [#37](https://github.com/lucapug/clown-circus-reloaded/issues/37), PR #38)
+
+Orchestrator-specified bugfix from the complete minimized diagnosis (the #27 precedent — no PM pass). Engineer ([PR #38](https://github.com/lucapug/clown-circus-reloaded/pull/38), 1 commit, test-only +14/−5): rewrote the setup to the #35 world — the default board-2 clown launches via input. One disclosed deviation, verified by the orchestrator before QA spend: from the pristine rest position the launch tick also emits `board-bounced` (real event, `events.ts:9`), so the board clown's y is lifted one launch fall clear of the bounce hit-box — keeping the three pinned assertions **byte-identical** (the issue declared the assertion set the contract). [QA VERDICT: PASS](https://github.com/lucapug/clown-circus-reloaded/pull/38#issuecomment-6312446414) — fresh-worktree battery, CI-identical RED proof (file reverted to main → same assertion error), byte-scope proof, deviation re-derived, and a **mutant discrimination test** (a fold counting all launches flips the test red — AC-3's point preserved). [REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/38#issuecomment-6312414137) — zero findings above [note], formed before reading QA's. CI 6/6 on the PR. Merge pending the owner.
+
+### Ledger (cycle #19)
+
+Engineer 810,803 · QA 1,004,985 · reviewer 308,932 → **≈ 2.12M**, 87 tool uses. Stalls 0, rework 0 — fourth consecutive clean cycle.
+
+### C1 verdict, criterion by criterion
+
+1. **Game playable on local/dev with core tests green: PASS.** Owner play-tested extensively through 2026-10-20 (multiple recorded sessions, forensic replay validated); suite 252 passed + 1 env-gated skip on `main`, 253/253-green with PR #38 (the one red test is the stale setup above, fix merge-ready).
+2. **Spec deltas closed: PASS.** Every named delta implemented and merged: bonusJumps option A (#8), streak v2 with spec §3.3 rewritten (#24), entry-height randomization with `RESPAWN_BOARD_HEIGHT_INDEX` retired (#20), free-side unification (#19), lever-only launch (#35), localStorage fallback (#10), lives floor (#27), recorder (#30/#33). `product-spec.md` contains no TODO and no open question.
+3. **CI green on `main` for the last ≥3 PRs: PASS on the PR criterion, with the finding recorded.** PRs #34, #36, #32 each ran 6/6 green on their merge-refs; the combined `main` push-run went red for the merge-order interaction above — found BY this C1 check and fixed merge-ready within the checkpoint day (PR #38). This is precisely the gap between "every PR green" and "main green"; with #38 merged the criterion holds unqualified.
+4. **Review load ≤6 h/day average: PASS** per the owner's own session rhythm (merge gates + play-test sessions + recorder reviews; no review backlog accumulated — every cycle's PR was merged same-day or next-morning).
+5. **No issue needing >1.5 sessions: PASS.** All 18 issues closed in single graph cycles; the largest (#9) still one session.
+
+**C1 = PASSED.** No cut-list item needs executing: M1+M2 complete a day ahead of their windows, ops untouched (all 5 graded points still in scope), M3 opens today on schedule. The STOP-and-rescope branch is not triggered.
+
+### Lessons
+
+- **PR-level CI cannot see merge-order interactions; only the push-run on `main` can.** Two individually-green PRs merged seconds apart produced a red main for a full evening. Cheap structural follow-up (M4): the deploy-on-green CD makes "main green" load-bearing — worth considering a re-run of failed main push-runs or a merge queue once CD exists.
+- The C1 formal check earned its keep exactly as designed: the "all criteria already green in practice" assumption from the handoff was ALMOST true — the one red signal was on `main` itself, invisible to the per-PR verdicts the diary had been recording.
+- The engineer's deviation handling is now a pattern worth naming: when the brief's suggested setup conflicts with the issue's pinned contract, keep the contract, adapt the setup minimally, disclose with the factual basis (here: the `board-bounced` trailing event) — QA re-derived it independently and the reviewer weighed it as a [note]. Zero rework, honest trail.
+
+### Next
+
+M3 opens (backend + DB + contract, window Oct 21–22): issues groomed next entry; decision C (DB signal log-only), the #10 contract-alignment relay (submissionId, outcome types), and spec §7 as the behavioral contract. PR #38 awaits the owner's merge.
