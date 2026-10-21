@@ -2,7 +2,7 @@
 
 **Purpose:** read-only visualization of the groomed backlog's dependency DAG. The canonical task state lives in **GitHub Issues** (plan decision D2); this map is an index, not a second backlog. Regenerate it whenever issues are added, split, or re-linked.
 
-**Snapshot date:** 2026-10-15, updated after PR #12 merged (#1 ✅) and the #3 → #2 dependency reconciliation (issue #2's Docker-build job needs #3's Dockerfile). M3–M7 issues are added as their milestones enter grooming.
+**Snapshot date:** 2026-10-21 — M2 fully closed (6/6 MUSTs + #19/#20/#24/#27/#30/#33/#35), M3 groomed (#39–#41). M4–M7 issues are added as their milestones enter grooming.
 
 ```mermaid
 graph TD
@@ -30,6 +30,14 @@ graph TD
     I35["#35 Lever-only launch ✅ merged"]
     end
 
+    subgraph M3["M3 — Contract + backend (Oct 21–22)"]
+        I39["#39 OpenAPI contract (openapi.yaml)"]
+        I40["#40 Backend: FastAPI + SQLAlchemy + idempotent /scores + API tests (TDD)"]
+        I41["#41 Switch services to real backend (compose + live §8)"]
+    end
+
+    I37["#37 CI-red fix: streak AC-3 × lever-only (PR #38 merge-ready)"]
+
     I1 --> I3
     I1 --> I4
     I3 --> I2
@@ -50,8 +58,12 @@ graph TD
     I30 --> I33
     I24 -.-> I27
     I35 -.-> I27
+
+    I10 --> I39
+    I39 --> I40
+    I40 --> I41
 ```
 
-**Critical path (longest chain):** #1 → #6 → #7 → #8 → #9 → #10 — the sequence the C1 checkpoint (Oct 21 EOD, plan §6) effectively watches; slippage here triggers the ordered cut list.
+**Critical path (longest chain):** #1 → #6 → #7 → #8 → #9 → #10 → #39 → #40 → #41 — M2's tail completed ahead of C1 (Oct 21, PASSED: see diary); M3 runs Oct 21–22 toward C2 (Oct 23 EOD, CD gate). #37's PR awaits the owner's merge (independent of M3's DAG).
 
 **Parallelism available:** after #1 landed, #3 and #4 are independent; #2 follows #3 (Docker-build job). After #9 lands, #10 and #11 are independent. These are the natural candidates for the worktree/parallelism experiments (deferred by default, plan §6 WONT v1).
