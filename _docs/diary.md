@@ -777,3 +777,33 @@ PM 275,874 · engineer **8,259,271 (largest single pass of the project)** · QA 
 ### Next
 
 Owner merges PR #43 (#40 closes; M3 2/3) → cycle #22 opens on #41 (switch services + live §8 verification — the last M3 issue), then M4 (integration/E2E/CD, C2 Oct 23 EOD).
+
+## 2026-10-21 — Cycle #22 (issue #41, PR #44): the real-backend switch — an engineer stall, a vacuous smoke, and M3's loop closed
+
+### What and why
+
+The last M3 issue closes the frontend-first loop: **live §8 verification against the real backend** — a vitest integration file (`frontend/src/services/__tests__/integration.leaderboard.test.ts`, jsdom env so `storage.ts` runs unmocked, real fetch to `LEADERBOARD_INTEGRATION_URL`, env-gated skip per the repo's existing pattern) covering saved / queued-on-down / drain-exactly-once-on-recovery / 422-dropped / **lost-response via an in-test `node:net` fault proxy** (destroys the client socket on the first upstream response byte = persistence committed, client never sees the 2xx → queued → drain → exactly one row). Compose proof that the built bundle has the HTTP service baked in (no `VITE_*` in the image build), and the AGENTS.md/README mock-vs-live dev recipe.
+
+### Incidents (recorded honestly)
+
+1. **Engineer killed by the 10-minute inactivity timeout mid-cycle** — second occurrence of this incident class, first since cycle #1. Recovery per the #30 precedent: the work lives in files, not agent memory — the tree held a coherent 243-line test file + docs (uncommitted); a FRESH engineer resumed from the tree, found and fixed one inherited defect by RUNNING the file (`net.Server#closeAllConnections` is an http.Server method — TypeError), committed, opened the PR. Second demonstration that the cycle survives agent loss.
+2. **QA: FAIL — the vacuous smoke.** The integration test's `node:net`/`Buffer` usage needed `@types/node`, absent from frontend deps: `tsc -b` failed → `npm run build` failed → Docker build failed → CI 4/6. The engineer's `npx tsc --noEmit` smoke was **vacuous** (root tsconfig `"files": []` checks nothing) — a green smoke that gates nothing. → **mini-agent trial #6** (`867b736`, 245k tokens — cheapest since trial #1): `@types/node` devDep only, no tsconfig change needed; QA re-verified on the REAL gate (`npm ci && npm run build`) → **[QA: PASS after rework](https://github.com/lucapug/clown-circus-reloaded/pull/44#issuecomment-6316024396)** (FAIL analysis kept below as audit trail), CI 6/6, and QA closed AC 1 first-hand (compose smoke: bundle greps — `/leaderboard?limit=` present, mock flag absent). The standing fix landed at the role-file source: **engineer.md now prescribes the real build gate** (`b0d2df9`) — the fourth prompt-borne incident class fixed at the source (after anti-hang, execute-only, diff-method).
+
+### Outcome and independent verdicts
+
+[PR #44](https://github.com/lucapug/clown-circus-reloaded/pull/44) — 3 commits + 1 rework, exactly 3 files + the devDep lockfile. The **split verdict worked as designed**: [REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/44#issuecomment-6315948407) (normative lens: tests pin §8 at the right level — production `leaderboardHttp` + unmocked storage, fresh-instance-over-same-localStorage = the "reload"; proxy faithful; docs truthful vs `=== '1'`; zero findings above note) while QA failed it on the mechanical build gate — two readers, two lenses, both right. QA's battery proved the §8 claims at the persistence layer (SQLite row counts: lost-response row exactly 1, zero duplicate submissionIds across runs incl. replay) and the lost-response test **non-vacuous** (disclosed pass-through patch → test RED → reverted).
+
+### Measured ledger (cycle #22)
+
+PM 383,290 · engineer interrupted (unmeasured) + resume 1,020,961 · QA 1,366,318 + 626,108 (re-check) · reviewer 408,865 · mini-agent 245,472 → **≈ 4.05M measurable**. Stalls 1 (inactivity kill), rework 1 (mini-agent trial #6). Mini-agent ledger after six trials: 253k / ~1M×3 / 603k / 245k — the P1.4 consolidation file has its spread.
+
+### Lessons
+
+- **A smoke is only worth the command CI runs.** Green from a command that checks nothing is worse than red — it manufactures false confidence at the cheapest stage. Role files compound: each fix hardens every future cycle.
+- The two-reader design earned its keep twice today: reviewer/QA split verdicts (normative quality vs mechanical gates) caught defects on *both* axes that a single combined pass would have averaged away.
+- Harness detail worth keeping: macOS lacks GNU `timeout`; the engineer used a `perl -e 'alarm N; exec @ARGV'` wrapper (SIGALRM survives exec) — the standing anti-hang recipes should assume it.
+- The brief's example payload name ("QA MECHANIC", 11 chars) itself 422s against the wire max of 10 — harness examples must satisfy the contract they exercise.
+
+### Next
+
+Owner merges PR #44 (#41 closes; **M3 3/3 complete**). Then **M4** (integration tests separated in Compose, Playwright happy-path E2E, GHCR immutable tags, deploy-on-green CD to dev, prod service + first manual promotion, scheduled health monitor) toward **C2 (Oct 23 EOD: CD green on dev + one promotion to prod)**. M4 grooming opens the next session.
