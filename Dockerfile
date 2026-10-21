@@ -8,7 +8,7 @@ RUN npm run build
 
 # Stage 2: Python 3.11 runtime + uv, serving the API and the built frontend.
 FROM python:3.11-slim-bookworm
-COPY --from=ghcr.io/astral-sh/uv:0.9.30 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.13.4 /uv /uvx /bin/
 
 ENV UV_LINK_MODE=copy
 WORKDIR /app

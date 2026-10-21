@@ -11,6 +11,10 @@ from urllib.parse import urlsplit
 
 DEFAULT_DATABASE_URL = "sqlite:///./clowncircus.db"
 
+# Vite dev origins served by default; CORS_ORIGINS (comma-separated) replaces
+# the allow-list (issue #40 D6; deployment-relevant, documented in the PR body).
+DEFAULT_CORS_ORIGINS = ("http://localhost:5173", "http://127.0.0.1:5173")
+
 
 def resolve_database(database_url: str | None = None) -> tuple[str, str]:
     """Return ``(url, backend)`` from a DATABASE_URL value.
@@ -27,3 +31,15 @@ def resolve_database(database_url: str | None = None) -> tuple[str, str]:
 def database_from_env() -> tuple[str, str]:
     """Resolve ``(url, backend)`` from the ``DATABASE_URL`` environment variable."""
     return resolve_database(os.getenv("DATABASE_URL"))
+
+
+def resolve_cors_origins(cors_origins: str | None = None) -> tuple[str, ...]:
+    """Return the CORS allow-list from a ``CORS_ORIGINS`` value.
+
+    Unset/empty -> ``DEFAULT_CORS_ORIGINS``; set -> comma-separated origins with
+    surrounding whitespace stripped. Empty entries are dropped.
+    """
+    raw = cors_origins if cors_origins is not None else os.getenv("CORS_ORIGINS")
+    if not raw:
+        return DEFAULT_CORS_ORIGINS
+    return tuple(origin.strip() for origin in raw.split(",") if origin.strip())

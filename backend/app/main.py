@@ -11,13 +11,19 @@ image), the backend serves it with an SPA fallback registered last so
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from opentelemetry.sdk._logs import LoggingHandler
 
-from app.config import database_from_env
+from app import models  # noqa: F401  (registers the mappings on Base.metadata)
+from app.config import database_from_env, resolve_cors_origins
+from app.database import Base, get_engine
+from app.routes_leaderboard import router as leaderboard_router
+from app.schemas import HealthStatus
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -25,10 +31,20 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DIST_DIR = BASE_DIR / "frontend" / "dist"
 
 
+def mask_database_url(url: str) -> str:
+    """Scheme + host (+port) only — never credentials, path, or DB name (Decision C)."""
+    parts = urlsplit(url)
+    host = parts.hostname or ""
+    if parts.port:
+        host = f"{host}:{parts.port}"
+    return f"{parts.scheme}://{host}"
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    _, backend = database_from_env()
-    logger.info("database backend: %s", backend)
+    url, _ = database_from_env()
+    logger.info("database target: %s", mask_database_url(url))
+    Base.metadata.create_all(get_engine())
     handler = LoggingHandler(level=logging.INFO)
     logger.addHandler(handler)
     try:
@@ -39,11 +55,18 @@ async def lifespan(_: FastAPI):
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Clown Circus Reloaded", lifespan=lifespan)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=list(resolve_cors_origins()),
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    app.include_router(leaderboard_router)
 
-    @app.get("/health")
-    def health() -> dict[str, str]:
+    @app.get("/health", response_model=HealthStatus)
+    def health() -> HealthStatus:
         logger.info("health check ok")
-        return {"status": "ok"}
+        return HealthStatus(status="ok")
 
     if DIST_DIR.is_dir():
         app.mount(
