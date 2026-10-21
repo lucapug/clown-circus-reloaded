@@ -2,8 +2,10 @@
 
 ``create_or_get`` implements the ``submissionId`` idempotency key: a lookup
 first, then an insert guarded by the DB-level unique constraint as an
-IntegrityError backstop for concurrent first-writes. No player names are ever
-logged or recorded on spans from here (plan §4 criterion 10).
+IntegrityError backstop for concurrent first-writes. ``list_leaderboard`` is
+the read side of the brief's file tree (order_by score DESC, created_at ASC,
+limit). No player names are ever logged or recorded on spans from here
+(plan §4 criterion 10).
 """
 
 from sqlalchemy import select
@@ -53,3 +55,18 @@ def create_or_get(
         return None, False
     db.refresh(stored)
     return stored, True
+
+
+def list_leaderboard(db: Session, limit: int) -> list[Score]:
+    """Leaderboard read (brief file tree: the query lives in crud, not the route).
+
+    Ordering per spec §7: score DESC, created_at ASC as the tie-break, capped
+    at ``limit``.
+    """
+    return list(
+        db.execute(
+            select(Score).order_by(Score.score.desc(), Score.created_at.asc()).limit(limit)
+        )
+        .scalars()
+        .all()
+    )

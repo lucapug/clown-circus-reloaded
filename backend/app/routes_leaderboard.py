@@ -1,12 +1,10 @@
 """Leaderboard API routes (issue #40): POST /scores and GET /leaderboard."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import crud
 from app.database import get_db
-from app.models import Score
 from app.schemas import LeaderboardEntry, LeaderboardResponse, ScoreRecord, ScoreSubmission
 
 router = APIRouter()
@@ -57,9 +55,7 @@ def submit_score(
 def get_leaderboard(
     limit: int = Query(default=10, ge=1, le=100), db: Session = Depends(get_db)
 ) -> LeaderboardResponse:
-    rows = db.execute(
-        select(Score).order_by(Score.score.desc(), Score.created_at.asc()).limit(limit)
-    ).scalars().all()
+    rows = crud.list_leaderboard(db, limit)
     entries = [
         LeaderboardEntry(rank=position, name=row.name, score=row.score, date=row.created_at)
         for position, row in enumerate(rows, start=1)
