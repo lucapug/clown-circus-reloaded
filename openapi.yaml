@@ -1,0 +1,212 @@
+openapi: 3.1.0
+info:
+  title: Clown Circus Reloaded Leaderboard API
+  version: 0.1.0
+  description: |
+    Normative API contract for the leaderboard backend, derived contract-first from
+    spec §7 and the reference client (frontend/src/services/leaderboardHttp.ts).
+
+    OpenAPI version decision: 3.1.0 — FastAPI >= 0.99 generates OpenAPI 3.1, so this
+    committed contract matches the schema the backend will emit once implemented
+    (the backend issue will assert generated-vs-committed parity).
+
+    Status coverage note: the client classifies submission outcomes as saved (any 2xx),
+    rejected (422 validation, 409 conflict, any other 4xx), or queued (5xx). Network
+    errors and timeouts are client-side conditions with no HTTP status, so they have no
+    response entry here by design; the queued classification for 5xx is documented on
+    the 500 responses.
+servers:
+  - url: /
+    description: Local, same-origin (client default VITE_API_BASE_URL unset; relative URLs are valid in 3.1)
+  - url: https://clown-circus-reloaded.onrender.com
+    description: Dev (Render)
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Liveness probe.
+      responses:
+        '200':
+          description: Service is healthy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+  /scores:
+    post:
+      operationId: submitScore
+      summary: Submit a leaderboard score (idempotent by submissionId).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScoreSubmission'
+      responses:
+        '201':
+          description: |
+            Score stored, or a replay of a previously stored submission. Idempotency:
+            the first call with a given submissionId inserts the record and returns it.
+            A replay of the same submissionId with an identical payload inserts nothing
+            and returns the ORIGINALLY STORED record — the body reflects the stored
+            record, not the re-sent payload. The client treats every 2xx as saved and
+            ignores the body today; this contract is normative.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScoreRecord'
+        '400':
+          description: Any other 4xx; the client classifies it as a definitive rejection (reason 'other'). Representative catch-all status.
+        '409':
+          description: Same submissionId with a different name or score; the stored record is unchanged (no mutation). Body shape is non-normative (FastAPI-conventional; spec §7 is silent and the client only branches on the status).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+        '422':
+          description: Validation error (FastAPI-native detail shape; the client only branches on the status).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Unexpected server error / transient outage; the client treats 5xx as NOT definitive and keeps the submission queued for retry.
+  /leaderboard:
+    get:
+      operationId: getLeaderboard
+      summary: Top scores, ordered by score descending, ties broken by created_at ascending.
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of entries to return.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+      responses:
+        '200':
+          description: Leaderboard entries, ordered by score descending, ties broken by created_at ascending (spec §7).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaderboardResponse'
+        '422':
+          description: Validation error (out-of-bounds limit).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Unexpected server error / transient outage; the client treats 5xx as NOT definitive and keeps submissions queued for retry.
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          const: ok
+          description: Literal "ok" (Decision C, owner 2026-10-19 — the body stays exactly {"status":"ok"}).
+    ScoreSubmission:
+      type: object
+      required:
+        - name
+        - score
+        - submissionId
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 10
+          pattern: '^[a-zA-Z0-9 ]+$'
+          description: Player name; the client trims it before sending — the contract validates the wire shape.
+        score:
+          type: integer
+          minimum: 0
+        submissionId:
+          type: string
+          format: uuid
+          description: Client-generated UUIDv4, unique-constrained server-side.
+    ScoreRecord:
+      type: object
+      required:
+        - id
+        - name
+        - score
+        - date
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          minLength: 1
+          maxLength: 10
+          pattern: '^[a-zA-Z0-9 ]+$'
+        score:
+          type: integer
+        date:
+          type: string
+          format: date-time
+          description: ISO 8601 / RFC 3339 timestamp; parity with the 2025 baseline's Pydantic datetime serialization.
+    LeaderboardEntry:
+      type: object
+      required:
+        - rank
+        - name
+        - score
+        - date
+      properties:
+        rank:
+          type: integer
+          description: 1-based position in the ordered leaderboard.
+        name:
+          type: string
+        score:
+          type: integer
+        date:
+          type: string
+          format: date-time
+          description: ISO 8601 / RFC 3339 timestamp.
+    LeaderboardResponse:
+      type: object
+      required:
+        - entries
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeaderboardEntry'
+    ValidationError:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: array
+          items:
+            type: object
+            required:
+              - type
+              - loc
+              - msg
+              - input
+            properties:
+              type:
+                type: string
+              loc:
+                type: array
+                items:
+                  oneOf:
+                    - type: string
+                    - type: integer
+              msg:
+                type: string
+              input:
+                description: The rejected input value (any JSON value).
