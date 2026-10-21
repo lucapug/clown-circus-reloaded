@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BOARD_HEIGHT,
+  BOARD_LAUNCH_VY,
+  CLOWN_SIZE,
+  DIVING_BOARDS,
   EDGE_LANDING_BONUS,
   FALL_OFF_Y,
   GRAVITY,
@@ -477,12 +481,17 @@ describe('launch streak v2 through step/advance (issue #24)', () => {
   });
 
   it('input launches never count toward the streak (AC-3)', () => {
-    // Two SEAT clowns (not the default board clown — a board launch would
-    // immediately re-bounce): the input launch sends clown 0 off the seat
-    // with vy −14, and the tick emits nothing but the launch.
-    const other = { ...seatedLeft(430), seesawSide: 'right' as const };
+    // #35 world (lever-only launch): the input launches ONLY the diving-board
+    // clown — the default state's board-2 clown (createInitialState). Its y
+    // is lifted one launch fall (BOARD_LAUNCH_VY + GRAVITY) clear of the
+    // board-2 bounce hit box, because from its rest position the same tick
+    // would trail a board-bounced event after the launch (see the tick-order
+    // pins) — and the assertion below is the contract: the tick emits nothing
+    // but the launch, and that input-sourced launch must NOT move the streak.
+    const base = playing({ balloons: [] });
+    const hitBoxTop = DIVING_BOARDS[2].y - BOARD_HEIGHT / 2 - CLOWN_SIZE;
     const { state, events } = step(
-      playing({ balloons: [], clowns: [seatedLeft(370), other] }),
+      { ...base, clowns: [base.clowns[0], { ...base.clowns[1], y: hitBoxTop - (BOARD_LAUNCH_VY + GRAVITY) - 1 }] },
       [{ type: 'launch' }],
       createRng(3),
       consequences,
