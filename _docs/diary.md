@@ -906,3 +906,32 @@ Run 1 after the fixes: **every API call green** — owners 200, PATCH 200 (**rep
 ### Next
 
 Cycle #26 on **#48** (prod service + first manual promotion of the immutable tag + scheduled health monitor — C2's second half). Owner-side: the prod Render service can now be created FROM the public GHCR image (`ghcr.io/lucapug/clown-circus-reloaded`, tag `main` or the digest), with the prod Neon `DATABASE_URL` and `OTEL_RESOURCE_ATTRIBUTES=…=prod`. Then #45/#46 in parallel.
+
+## 2026-10-22 — Cycle #26 (issue #48, PR #54): prod promotion + health monitor — **C2 ACHIEVED one day early**
+
+### What and why
+
+The C2-closing cycle: `cd-promote.yml` (workflow_dispatch ONLY — inputs `tag` + optional `expected_digest`; anonymous GHCR digest resolution; **digest mismatch refuses promotion before any Render call**; then the proven Render sequence — owners → image PATCH → env-vars GET/PUT with prod values → POST deploy → poll 45×20 s with transient tolerance → PROD health exact-body) and `health-monitor.yml` (cron `*/15` + workflow_dispatch; both `/health` URLs; 3×10 s retries; exact-body; `permissions: {}`; the red job IS M5's alert hook). Plus the one-line `DEV_HEALTH_URL` variable migration in cd-dev.yml and the runbook promotion/rollback section. The owner-side enabler: the prod Render service (`clown-circus-reloaded-prod`, `srv-dbcv5p7avr4c738u0pq0`) was created repo-build mode from the wizard (whose GHCR "Existing image" search stubbornly refused the public package — anonymous pull worked, Render's validator didn't; lesson in the runbook), with prod Neon `DATABASE_URL`, service-level `OTEL_RESOURCE_ATTRIBUTES=…=prod`, otel group linked **at creation**, and auto-deploy OFF.
+
+### The C2 demonstration (all orchestrator-executed, evidence on #48)
+
+1. **Deploy-on-green, zero-touch**: merge `bd1adea` → CI 39777072698 green → auto-CD 39777199373 → image `…:20261022-121803-bd1adea` (digest `sha256:443efc94…`) → dev redeployed automatically (~2 min).
+2. **Manual promotion**: [run 39777647379](https://github.com/lucapug/clown-circus-reloaded/actions/runs/39777647379) dispatched with tag + expected digest → digest MATCHED → prod switched repo→image mode → `live` in **~90 seconds** → prod `/health` 200 exact-body (first probe hit the 42 s cold start — by plan). **The same digest now serves both environments.**
+3. **Health monitor**: dispatch 39780621626 → SUCCESS on both URLs; cron armed (also keeps the free-tier services warm).
+
+**C2 (Oct 23 EOD): ACHIEVED Oct 22 midday** — CD green on dev (automatic) + one manual promotion to prod demonstrated, rollback documented. The plan's fallback (paper promotion) never needed.
+
+### Measured ledger (cycle #26)
+
+PM 223,647 · engineer 2,618,180 · QA 1,179,926 · reviewer 466,660 → **≈ 4.49M**. Two-day loop total (cycles #19–#26): **≈ 42.0M** measurable. The three dispatch runs + monitor test: zero subagent tokens.
+
+### Lessons
+
+- **The wizard/API asymmetry is now documented**: Render's "Existing image" search refused a provably-public GHCR package while the anonymous registry pull succeeded AND the API PATCH had switched dev to image mode the day's cycle before — when a platform wizard disagrees with the protocol, the protocol wins (and the runbook records both paths).
+- **Promotion identity is enforced, not promised**: the digest assert fires before the first Render call — the #49 reviewer's mutability note became an operational gate.
+- The first-switch queueing lesson (three serialized deploys) was pre-paid into the promote poll cap (45×20 s); the actual promotion took ~90 s once the mode was settled — caps sized by evidence, not fear.
+- C2's checklist is now fully mechanical: merge → CI → auto-CD (dev) → promote (prod, manual, digest-gated) → monitor green on both.
+
+### Next
+
+M4 remains open on #45 (integration suite in Compose, single-command tests) and #46 (Playwright E2E happy path) — both independent, both rubric-relevant for Testing depth. Then M5 (Grafana dashboards, ≥1 alert on the monitor's red hook, on-call drill tier 1) and M6 (docs/demo) toward the Oct-26 submission. Post-merge housekeeping for the orchestrator: none pending — all repo variables set.
