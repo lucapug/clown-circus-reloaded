@@ -36,7 +36,7 @@ concurrency:
 env:
   IMAGE_NAME: ghcr.io/lucapug/clown-circus-reloaded
   RENDER_API_BASE: https://api.render.com/v1
-  DEV_HEALTH_URL: https://clown-circus-reloaded.onrender.com/health
+  DEV_HEALTH_URL: ${{ vars.DEV_HEALTH_URL || 'https://clown-circus-reloaded.onrender.com/health' }}
   # The commit CD deploys is the CI-green head of the triggering run — NOT
   # GITHUB_SHA, which under `workflow_run` is the default-branch HEAD and can
   # drift past the tested commit if more pushes land while the deploy runs.
