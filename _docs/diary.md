@@ -964,3 +964,9 @@ Cycle #28 needed **zero rework**: [QA PASS](https://github.com/lucapug/clown-cir
 ### Next
 
 **M4 4/4 on the owner's merge of PR #56.** Remaining toward Oct-26: M5 (Grafana Cloud dashboards for the key journey, ≥1 actionable alert wired to the health-monitor red, on-call drill tier 1 — telemetry and the alert hook are already armed), M6 (README/docs polish, demo artifacts), M7 (repo public + submission). #45/#46 were the last groomed build issues; M5/M6 grooming next session.
+
+## 2026-10-22 (evening) — Addendum: shared-tree incident, the play worktree, and a play report
+
+**Incident (orchestrator-caused, owned):** while the owner played on `npm run dev` from the SHARED working tree, my post-cycle `git checkout main` (leaving `feat/46-playwright-e2e`, where `vite.config.ts` is modified) triggered a Vite restart → page reload → an in-flight game (4–5 lives) reset. Structural fix, applied immediately: a dedicated **detached play worktree** at `../ccr-play` (deps installed; agents never touch it; owner updates between games with `git fetch && git checkout --detach origin/main`). The localStorage ring and leaderboard cache survive — same origin :5173.
+
+**Play report → issue [#57](https://github.com/lucapug/clown-circus-reloaded/issues/57):** a board clown stranded at vx≈0 (no slide, no fall). Related-but-distinct from the deferred "skating" v2 item (vx PERSISTING). No finalized trace (the session died in the restart) — the issue holds the report, asks for a recorder trace at the next occurrence, and poses the 2025-parity + fix-vs-v2 questions to the owner. Recommendation recorded: decide after M5 unless gameplay-breaking (the stranded clown soft-locks only itself; input launch still works).
