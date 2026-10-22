@@ -878,3 +878,31 @@ PM 248,551 · engineer 1,870,969 · QA 1,225,275 + 1,100,436 + 442,770 · review
 ### Next
 
 Owner merges PR #49 (#47 closes) → the owner's Render secret/variable + first configured run provide the Render-leg evidence; cycle #24 on **#48** (prod service + first manual promotion + health monitor — the other C2 half); #45/#46 fill the parallel slots.
+
+## 2026-10-22 — Cycles #24–#25 and the first configured runs: CD to dev is LIVE (C2's first half closed)
+
+### What and why
+
+Three slim cycles took the CD from merged to **proven on the real Render service**, plus the owner-side platform setup (Render API key → GitHub secret, service ID → repo variable, GHCR package flipped public, prod Neon database created):
+
+- **Cycle #24 (issue #50, PR #51)**: the first configured run (39747325427) failed in `push-ghcr` — the tag-list step wrote BARE lines to `$GITHUB_OUTPUT` (`Invalid format`); Actions requires `key=value`, multiline via `tags<<EOF … EOF`. The dry-run could not catch it: the runner output protocol exists only inside Actions. Fix + the dry-run gained its first mirror of that step (the blind spot became a check). QA PASS (mutation proof, consumer spec verified against build-push-action source), REVIEW APPROVE. Merged; **push-ghcr green on the next run — the GHCR package exists**.
+- **Cycle #25 (issue #52, PR #53)**: the second first-run finding — Render `PATCH` returned **400**: `envVars` is not a `servicePATCH` field (separate bulk `PUT /services/{id}/env-vars`), and `image` requires `ownerId` (fetched dynamically via `GET /v1/owners`). Also fixed: the swallowed error body (`curl -fsS … >/dev/null` — the exact anti-pattern the runbook now bans) and a poll-reliability refinement routed by the orchestrator (transient api errors = failed attempts, fatal at 3 consecutive; terminal statuses immediate). QA PASS (env-merge byte-preservation re-run, all mutations bite), REVIEW APPROVE after one truthfulness [minor] fixed (runbook bullet). Merged.
+
+### The first configured runs (orchestrator-dispatched, evidence on #47)
+
+Run 1 after the fixes: **every API call green** — owners 200, PATCH 200 (**repo→image mode switch accepted**), env-vars GET/PUT 200 with `DATABASE_URL` preserved, POST deploy 202 — but the deploy stayed `update_in_progress` past the 10-minute poll cap: the mode switch had queued up to three serialized deploys (PATCH auto + env auto + explicit), each pulling the image. The cap did its job (fast fail, full evidence). Re-dispatch once image mode was active: **green end-to-end in ~3 minutes** (run 39762394105). Deployed: `…:20261022-102048-84d7ba4`, digest `sha256:bf52c54b…`, provenance chain intact (CI-green commit = built code = tag sha = `service.version`). Live check 200 in 0.6 s. Evidence comment posted on #47. **The dev service now runs in GHCR image mode — the promotion primitive #48 needs exists.** Cold-start reminder: one verification curl hit a >30 s wake-up (free tier, by plan); the #48 health monitor will keep it warm.
+
+### Measured ledger (cycles #24–#25 + today's platform debug session)
+
+#24: engineer 580,587 · QA 944,516 · reviewer 164,950 ≈ **1.69M**. #25: engineer 4,576,092 + 1,300,999 · QA 1,894,553 · reviewer 345,731 · mini-agent 260,629 ≈ **8.38M**. Two-day loop total (cycles #19–#25): **≈ 37.5M** measurable subagent tokens — full per-cycle table delivered to the owner on request (2026-10-22); mini-agent series now 9 trials (#5–#9 average ~340k vs ~1M for the resumed-context #3–#4 — the P1.4 answer is in). Dispatch/monitoring itself: zero subagent tokens (pure Actions).
+
+### Lessons
+
+- **Declared verification boundaries convert first-run failures from crises into findings**: both red runs landed exactly inside the pre-declared "proven on first configured run" envelope — no credibility lost, two real API lessons captured as groomed issues with complete orchestrator-minimized diagnoses.
+- **Cloud-platform workflows have runner-only protocols** (`GITHUB_OUTPUT`) and **cross-API contracts** (Render's servicePATCH vs env-vars endpoint) that no local rehearsal can fully cover; the honest split is rehearsal-for-logic + real-run-for-protocol, with error bodies ALWAYS visible (the swallowed 400 cost a cycle; the printed ones cost minutes).
+- **First image-mode switches queue multiple deploys** (PATCH auto + env auto + explicit) — poll caps must be sized for the queue, or the re-dispatch pattern used once the switch settles.
+- The reviewer's re-verification of a fix is not a formality (checkout-provenance catch, cycle #23) and a reviewer's truthfulness finding on a Deviations claim (this cycle) both landed — the independent readers keep earning their tokens.
+
+### Next
+
+Cycle #26 on **#48** (prod service + first manual promotion of the immutable tag + scheduled health monitor — C2's second half). Owner-side: the prod Render service can now be created FROM the public GHCR image (`ghcr.io/lucapug/clown-circus-reloaded`, tag `main` or the digest), with the prod Neon `DATABASE_URL` and `OTEL_RESOURCE_ATTRIBUTES=…=prod`. Then #45/#46 in parallel.
