@@ -16,7 +16,11 @@
 #   (iii) the deploy poll loop terminates on `live`, and the health assert
 #         passes on the exact body {"status":"ok"} and FAILS on the mutated
 #         bodies (trailing space, HTTP 503) — the mutation check proving the
-#         assert is exact-byte.
+#         assert is exact-byte;
+#   (iv)  the push-ghcr "Build tag list" construct (issue #50 fix) writes
+#         the EOF-delimited multiline form into a mock GITHUB_OUTPUT file,
+#         and the runner-equivalent parse yields the immutable tag plus the
+#         moving `main` tag exactly when mainonly=yes.
 #
 # Retries/timings default to the workflow's values but are tunable so the
 # rehearsal runs in seconds: POLL_ATTEMPTS/POLL_INTERVAL/HEALTH_ATTEMPTS/
@@ -148,6 +152,33 @@ construct_tags() {
 }
 
 # ---------------------------------------------------------------------------
+# push-ghcr-equivalent: Build tag list (identical block to the workflow,
+# issue #50) — GITHUB_OUTPUT replaced by a mock file. Actions requires
+# key=value (or heredoc) lines in GITHUB_OUTPUT: bare lines abort the step
+# with `Invalid format`, hence the `tags<<EOF ... EOF` multiline form.
+# ---------------------------------------------------------------------------
+GITHUB_OUTPUT_MOCK="$STATE/github_output"
+build_tag_list() {
+  : > "$GITHUB_OUTPUT_MOCK"
+  {
+    echo "tags<<EOF"
+    echo "${IMAGE_NAME}:${IMMUTABLE}"
+    if [[ "${MAINONLY:-no}" == "yes" ]]; then
+      echo "${IMAGE_NAME}:main"
+    fi
+    echo "EOF"
+  } >> "$GITHUB_OUTPUT_MOCK"
+}
+
+# Runner-equivalent parse of the mock GITHUB_OUTPUT: everything between the
+# `tags<<EOF` and `EOF` lines is ONE output named `tags` — this is exactly
+# what `steps.tags.outputs.tags` (docker/build-push-action's `tags` input)
+# receives.
+parse_tags_output() {
+  TAGS_OUTPUT="$(awk '/^tags<<EOF$/{f=1;next} /^EOF$/{f=0} f' "$GITHUB_OUTPUT_MOCK")"
+}
+
+# ---------------------------------------------------------------------------
 # deploy-dev-equivalent steps (same logic as the workflow)
 # ---------------------------------------------------------------------------
 patch_service() {
@@ -208,6 +239,23 @@ if [[ "$IMMUTABLE" =~ ^20[0-9]{6}-[0-9]{6}-[0-9a-f]{7}$ ]]; then
   pass "immutable tag matches ^20[0-9]{6}-[0-9]{6}-[0-9a-f]{7}\$ (date -u UTC clock)"
 else
   fail "immutable tag malformed: $IMMUTABLE"
+fi
+
+MAINONLY=no build_tag_list; parse_tags_output
+echo "tags output (mainonly=no): $TAGS_OUTPUT"
+if [[ "$TAGS_OUTPUT" == "${IMAGE_NAME}:${IMMUTABLE}" ]]; then
+  pass "mainonly=no: tags output is exactly the immutable tag (single line)"
+else
+  fail "mainonly=no: tags output malformed: '$TAGS_OUTPUT'"
+fi
+
+MAINONLY=yes build_tag_list; parse_tags_output
+echo "tags output (mainonly=yes):"
+echo "$TAGS_OUTPUT" | sed 's/^/  /'
+if [[ "$TAGS_OUTPUT" == "${IMAGE_NAME}:${IMMUTABLE}"$'\n'"${IMAGE_NAME}:main" ]]; then
+  pass "mainonly=yes: tags output carries immutable + moving main (two lines)"
+else
+  fail "mainonly=yes: tags output malformed: '$TAGS_OUTPUT'"
 fi
 
 patch_service

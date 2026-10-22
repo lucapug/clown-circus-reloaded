@@ -84,14 +84,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # GITHUB_OUTPUT multiline protocol (issue #50): bare lines abort the
+      # step with `Invalid format`; the `key<<EOF ... EOF` heredoc form
+      # yields ONE output `tags` whose value is the newline-joined list that
+      # docker/build-push-action consumes below.
       - id: tags
         name: Build tag list (moving main tag only on main)
         run: |
           {
+            echo "tags<<EOF"
             echo "${IMAGE_NAME}:${{ needs.meta.outputs.immutable }}"
             if [[ "${{ needs.meta.outputs.mainonly }}" == "yes" ]]; then
               echo "${IMAGE_NAME}:main"
             fi
+            echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
       # Single build+push of both tags; the deploy job reuses this tag and
