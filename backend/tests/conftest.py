@@ -5,6 +5,8 @@ wired into the app via ``app.dependency_overrides[get_db]`` so
 ``create_app()`` stays no-arg (``test_health.py`` keeps working unchanged).
 """
 
+import os
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -13,18 +15,29 @@ from app.main import create_app
 
 @pytest.fixture()
 def test_db(tmp_path, monkeypatch):
-    """Isolated file-based SQLite DB in tmp_path; returns (engine, session factory)."""
+    """Isolated file-based SQLite DB in tmp_path; returns (engine, session factory).
+
+    Issue #45 (disclosed test tooling): with ``IT_DATABASE_URL`` set, the
+    integration harness points the suite at a shared Postgres instead —
+    schema is dropped and recreated per test; the SQLite default is unchanged.
+    """
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
 
     from app import models  # noqa: F401  (registers the mappings on Base.metadata)
     from app.database import Base
 
-    db_path = tmp_path / "test.db"
-    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path}")
-    engine = create_engine(
-        f"sqlite:///{db_path}", connect_args={"check_same_thread": False}
-    )
+    if os.environ.get("IT_DATABASE_URL"):
+        from app.database import normalize_database_url
+
+        engine = create_engine(normalize_database_url(os.environ["IT_DATABASE_URL"]))
+        Base.metadata.drop_all(engine)
+    else:
+        db_path = tmp_path / "test.db"
+        monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path}")
+        engine = create_engine(
+            f"sqlite:///{db_path}", connect_args={"check_same_thread": False}
+        )
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     return engine, factory
