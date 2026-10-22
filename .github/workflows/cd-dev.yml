@@ -58,9 +58,11 @@ jobs:
         run: |
           SHORTSHA="${DEPLOY_SHA::7}"
           IMMUTABLE="$(date -u +%Y%m%d-%H%M%S)-${SHORTSHA}"   # e.g. 20261022-141503-1a2b3c4
-          echo "shortsha=$SHORTSHA"      >> "$GITHUB_OUTPUT"
-          echo "immutable=$IMMUTABLE"    >> "$GITHUB_OUTPUT"
-          echo "mainonly=$([[ $GITHUB_REF == refs/heads/main ]] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
+          {
+            echo "shortsha=$SHORTSHA"
+            echo "immutable=$IMMUTABLE"
+            echo "mainonly=$([[ $GITHUB_REF == refs/heads/main ]] && echo yes || echo no)"
+          } >> "$GITHUB_OUTPUT"
 
   # Build ONCE, push immutable (+ moving main) tag. `packages: write` is
   # scoped to THIS job only; deploy-dev gets no packages permission.
@@ -122,6 +124,21 @@ jobs:
   # Deploy the exact pushed image to the Render dev service and validate
   # health. Degrades to a green no-op with a loud notice while
   # RENDER_API_KEY (secret) / RENDER_DEV_SERVICE_ID (repo variable) are unset.
+  #
+  # Call ordering (issue #52): fetch owner → PATCH image → PUT env-vars →
+  # POST deploy → poll `live` → /health. Render SERIALIZES deploys per
+  # service: the PATCH and the env-vars PUT can each enqueue an auto-deploy,
+  # but a later explicit POST /deploys SUPERSEDES those intermediate
+  # auto-deploys (Render cancels them as superseded). Only the final explicit
+  # deploy — which then carries BOTH the new image and the new environment —
+  # must reach `live`, so every mutation happens strictly BEFORE the POST.
+  #
+  # Error visibility (issue #52): every call goes through the per-step `api`
+  # helper — `curl -sS -w '\nHTTP_STATUS:%{http_code}'` into a variable,
+  # status printed, and any non-2xx fails the step WITH Render's response
+  # body in the log. Never `curl -f` with swallowed output. (Render error
+  # responses are {"message": …} diagnostics; on the success path only KEY
+  # NAMES of env vars are printed, never values.)
   deploy-dev:
     needs: [meta, push-ghcr]
     runs-on: ubuntu-latest
@@ -157,26 +174,138 @@ jobs:
             echo "(GHCR push above still ran; deploy skipped, job stays green)"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # ONE API call carries BOTH the image reference and service.version
-      # (short sha). NOTE: this replaces the dev service's current
-      # OTEL_RESOURCE_ATTRIBUTES (current value: deployment.environment.name=dev
-      # per the 2026-10-21 Render env work). If PATCHing envVars auto-triggers
-      # a Render deploy, the POST below returns a queued duplicate deploy of
-      # the same image — harmless; observe on first real run.
-      - name: PATCH service image + service.version
+      # The `api` helper (identical lines in every configured step below):
+      # status capture via -w, body always in reach, non-2xx -> loud fail with
+      # the body printed. Diagnostics go to stderr so a caller that discards
+      # stdout (patch/put whose response it does not need) still shows them.
+      - name: Fetch workspace ownerId (GET /owners)
+        id: owner
+        if: steps.cfg.outputs.configured == 'true'
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: |
+          api() {
+            local method="$1" path="$2" body="${3:-}"
+            local args=(-sS -w '\nHTTP_STATUS:%{http_code}' -X "$method" -H "Authorization: Bearer $RENDER_API_KEY" -H "Content-Type: application/json")
+            if [[ -n "$body" ]]; then args+=(-d "$body"); fi
+            local resp status payload
+            if ! resp="$(curl "${args[@]}" "${RENDER_API_BASE}${path}")"; then
+              echo "::error::curl transport failure on $method $path" >&2; exit 1
+            fi
+            status="${resp##*$'\n'}"; status="${status#HTTP_STATUS:}"
+            payload="${resp%$'\n'*}"
+            echo "render $method $path -> HTTP $status" >&2
+            if [[ ! "$status" =~ ^2[0-9][0-9]$ ]]; then
+              echo "::error::Render API $method $path failed (HTTP $status) — response body follows:" >&2
+              printf '%s\n' "$payload" >&2
+              exit 1
+            fi
+            printf '%s\n' "$payload"
+          }
+          OWNERS_JSON="$(api GET /owners)"
+          N="$(echo "$OWNERS_JSON" | jq 'length')"
+          if [[ "$N" -ne 1 ]]; then
+            echo "::error::expected exactly 1 owner (one-workspace account), got $N:" >&2
+            echo "$OWNERS_JSON" | jq -r '.[] | "  \(.id) — \(.name // .email // "?")"' >&2
+            exit 1
+          fi
+          OWNER_ID="$(echo "$OWNERS_JSON" | jq -r '.[0].id')"
+          echo "owner_id=$OWNER_ID" >> "$GITHUB_OUTPUT"
+
+      # servicePATCH (api-docs.render.com, issue #52): `image` REQUIRES both
+      # `ownerId` and `imagePath`, and NOTHING else goes in this call —
+      # `envVars` is not an accepted servicePATCH field at all.
+      - name: PATCH service image (ownerId + imagePath only)
+        if: steps.cfg.outputs.configured == 'true'
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_DEV_SERVICE_ID: ${{ vars.RENDER_DEV_SERVICE_ID }}
+          OWNER_ID: ${{ steps.owner.outputs.owner_id }}
+        run: |
+          api() {
+            local method="$1" path="$2" body="${3:-}"
+            local args=(-sS -w '\nHTTP_STATUS:%{http_code}' -X "$method" -H "Authorization: Bearer $RENDER_API_KEY" -H "Content-Type: application/json")
+            if [[ -n "$body" ]]; then args+=(-d "$body"); fi
+            local resp status payload
+            if ! resp="$(curl "${args[@]}" "${RENDER_API_BASE}${path}")"; then
+              echo "::error::curl transport failure on $method $path" >&2; exit 1
+            fi
+            status="${resp##*$'\n'}"; status="${status#HTTP_STATUS:}"
+            payload="${resp%$'\n'*}"
+            echo "render $method $path -> HTTP $status" >&2
+            if [[ ! "$status" =~ ^2[0-9][0-9]$ ]]; then
+              echo "::error::Render API $method $path failed (HTTP $status) — response body follows:" >&2
+              printf '%s\n' "$payload" >&2
+              exit 1
+            fi
+            printf '%s\n' "$payload"
+          }
+          BODY="$(jq -n --arg owner "$OWNER_ID" \
+            --arg img "${IMAGE_NAME}:${{ needs.meta.outputs.immutable }}" \
+            '{image: {ownerId: $owner, imagePath: $img}}')"
+          api PATCH "/services/$RENDER_DEV_SERVICE_ID" "$BODY" > /dev/null
+
+      # service.version per deploy (issue #52): `envVars` is NOT a servicePATCH
+      # field — env vars are managed by the bulk endpoint. GET the full list
+      # (cursor-paginated; items are {"cursor":…,"envVar":{key,value}}),
+      # jq-update ONLY OTEL_RESOURCE_ATTRIBUTES (add if absent) — every other
+      # key/value, DATABASE_URL above all, passes through byte-for-byte —
+      # then PUT the complete list back (bulk replace).
+      - name: Update OTEL_RESOURCE_ATTRIBUTES via env-vars endpoint
         if: steps.cfg.outputs.configured == 'true'
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           RENDER_DEV_SERVICE_ID: ${{ vars.RENDER_DEV_SERVICE_ID }}
         run: |
-          OTEL="deployment.environment.name=dev,service.version=${{ needs.meta.outputs.shortsha }}"
-          BODY=$(jq -n --arg img "${IMAGE_NAME}:${{ needs.meta.outputs.immutable }}" --arg otel "$OTEL" \
-            '{image:{imagePath:$img},envVars:[{key:"OTEL_RESOURCE_ATTRIBUTES",value:$otel}]}')
-          curl -fsS -X PATCH \
-            -H "Authorization: Bearer $RENDER_API_KEY" \
-            -H "Content-Type: application/json" \
-            -d "$BODY" \
-            "${RENDER_API_BASE}/services/$RENDER_DEV_SERVICE_ID" > /dev/null
+          api() {
+            local method="$1" path="$2" body="${3:-}"
+            local args=(-sS -w '\nHTTP_STATUS:%{http_code}' -X "$method" -H "Authorization: Bearer $RENDER_API_KEY" -H "Content-Type: application/json")
+            if [[ -n "$body" ]]; then args+=(-d "$body"); fi
+            local resp status payload
+            if ! resp="$(curl "${args[@]}" "${RENDER_API_BASE}${path}")"; then
+              echo "::error::curl transport failure on $method $path" >&2; exit 1
+            fi
+            status="${resp##*$'\n'}"; status="${status#HTTP_STATUS:}"
+            payload="${resp%$'\n'*}"
+            echo "render $method $path -> HTTP $status" >&2
+            if [[ ! "$status" =~ ^2[0-9][0-9]$ ]]; then
+              echo "::error::Render API $method $path failed (HTTP $status) — response body follows:" >&2
+              printf '%s\n' "$payload" >&2
+              exit 1
+            fi
+            printf '%s\n' "$payload"
+          }
+          CURSOR=""
+          : > "$RUNNER_TEMP/env-vars.jsonl"
+          while :; do
+            EP="/services/$RENDER_DEV_SERVICE_ID/env-vars?limit=100"
+            if [[ -n "$CURSOR" ]]; then
+              EP="${EP}&cursor=$(jq -rn --arg c "$CURSOR" '$c|@uri')"
+            fi
+            PAGE="$(api GET "$EP")"
+            echo "$PAGE" | jq -c '.[].envVar' >> "$RUNNER_TEMP/env-vars.jsonl"
+            CURSOR="$(echo "$PAGE" | jq -r '.[-1].cursor // empty')"
+            if [[ -z "$CURSOR" ]]; then break; fi
+          done
+          CURRENT="$(jq -s '.' "$RUNNER_TEMP/env-vars.jsonl")"   # one flat [{key,value}, ...]
+          echo "fetched env var keys: $(echo "$CURRENT" | jq -r 'map(.key) | join(", ")')"
+          NEW_OTEL="deployment.environment.name=dev,service.version=${{ needs.meta.outputs.shortsha }}"
+          UPDATED="$(echo "$CURRENT" | jq --arg k OTEL_RESOURCE_ATTRIBUTES --arg v "$NEW_OTEL" '
+            if any(.[]; .key == $k)
+            then map(if .key == $k then .value = $v else . end)
+            else . + [{"key": $k, "value": $v}] end')"
+          # Post-conditions on the PUT body: DATABASE_URL still present and
+          # OTEL carries the new value. Key names only in the log — values
+          # (DATABASE_URL) are never printed.
+          if ! echo "$UPDATED" | jq -e --arg v "$NEW_OTEL" '
+            (any(.[]; .key == "DATABASE_URL")) and
+            (any(.[]; .key == "OTEL_RESOURCE_ATTRIBUTES" and .value == $v))' > /dev/null; then
+            echo "::error::env-vars PUT body failed post-conditions (DATABASE_URL present + new OTEL value)" >&2
+            echo "keys in PUT body: $(echo "$UPDATED" | jq -r 'map(.key) | join(", ")')" >&2
+            exit 1
+          fi
+          api PUT "/services/$RENDER_DEV_SERVICE_ID/env-vars" "$UPDATED" > /dev/null
+          echo "env-vars updated: OTEL_RESOURCE_ATTRIBUTES=$NEW_OTEL (all other keys preserved)"
 
       - name: POST deploy of the immutable image
         id: deploy
@@ -185,47 +314,108 @@ jobs:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           RENDER_DEV_SERVICE_ID: ${{ vars.RENDER_DEV_SERVICE_ID }}
         run: |
-          RESP=$(curl -fsS -X POST \
-            -H "Authorization: Bearer $RENDER_API_KEY" \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n --arg img "${IMAGE_NAME}:${{ needs.meta.outputs.immutable }}" '{imageUrl:$img}')" \
-            "${RENDER_API_BASE}/services/$RENDER_DEV_SERVICE_ID/deploys")
-          DEPLOY_ID=$(echo "$RESP" | jq -r '.id')
+          api() {
+            local method="$1" path="$2" body="${3:-}"
+            local args=(-sS -w '\nHTTP_STATUS:%{http_code}' -X "$method" -H "Authorization: Bearer $RENDER_API_KEY" -H "Content-Type: application/json")
+            if [[ -n "$body" ]]; then args+=(-d "$body"); fi
+            local resp status payload
+            if ! resp="$(curl "${args[@]}" "${RENDER_API_BASE}${path}")"; then
+              echo "::error::curl transport failure on $method $path" >&2; exit 1
+            fi
+            status="${resp##*$'\n'}"; status="${status#HTTP_STATUS:}"
+            payload="${resp%$'\n'*}"
+            echo "render $method $path -> HTTP $status" >&2
+            if [[ ! "$status" =~ ^2[0-9][0-9]$ ]]; then
+              echo "::error::Render API $method $path failed (HTTP $status) — response body follows:" >&2
+              printf '%s\n' "$payload" >&2
+              exit 1
+            fi
+            printf '%s\n' "$payload"
+          }
+          BODY="$(jq -n --arg img "${IMAGE_NAME}:${{ needs.meta.outputs.immutable }}" '{imageUrl:$img}')"
+          RESP="$(api POST "/services/$RENDER_DEV_SERVICE_ID/deploys" "$BODY")"
+          DEPLOY_ID="$(echo "$RESP" | jq -r '.id')"
+          if [[ -z "$DEPLOY_ID" || "$DEPLOY_ID" == "null" ]]; then
+            echo "::error::POST deploy returned no deploy id" >&2; exit 1
+          fi
           echo "deploy_id=$DEPLOY_ID" >> "$GITHUB_OUTPUT"
 
       # Bounded poll: 30 attempts x 20 s = 10 min cap. Timeout is RED.
+      # Transient API errors (429/5xx/transport) fail the ATTEMPT, not the
+      # step: the helper's status+body output is captured and shown per
+      # attempt, a successful call resets the counter, and only 3
+      # CONSECUTIVE failures give up RED with the last body. Terminal deploy
+      # statuses and the cap are unaffected.
       - name: Poll deploy status until live
         if: steps.cfg.outputs.configured == 'true'
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           RENDER_DEV_SERVICE_ID: ${{ vars.RENDER_DEV_SERVICE_ID }}
+          DEPLOY_ID: ${{ steps.deploy.outputs.deploy_id }}
         run: |
+          api() {
+            local method="$1" path="$2" body="${3:-}"
+            local args=(-sS -w '\nHTTP_STATUS:%{http_code}' -X "$method" -H "Authorization: Bearer $RENDER_API_KEY" -H "Content-Type: application/json")
+            if [[ -n "$body" ]]; then args+=(-d "$body"); fi
+            local resp status payload
+            if ! resp="$(curl "${args[@]}" "${RENDER_API_BASE}${path}")"; then
+              echo "::error::curl transport failure on $method $path" >&2; exit 1
+            fi
+            status="${resp##*$'\n'}"; status="${status#HTTP_STATUS:}"
+            payload="${resp%$'\n'*}"
+            echo "render $method $path -> HTTP $status" >&2
+            if [[ ! "$status" =~ ^2[0-9][0-9]$ ]]; then
+              echo "::error::Render API $method $path failed (HTTP $status) — response body follows:" >&2
+              printf '%s\n' "$payload" >&2
+              exit 1
+            fi
+            printf '%s\n' "$payload"
+          }
+          CONSECUTIVE=0
+          API_ERR="$RUNNER_TEMP/poll-api.err"
           for i in $(seq 1 30); do
-            STATUS=$(curl -fsS -H "Authorization: Bearer $RENDER_API_KEY" \
-              "${RENDER_API_BASE}/services/$RENDER_DEV_SERVICE_ID/deploys/${{ steps.deploy.outputs.deploy_id }}" \
-              | jq -r '.status' 2>/dev/null || true)
-            echo "poll $i/30: ${STATUS:-<no response>}"
-            case "$STATUS" in
-              live) echo "deploy is live"; exit 0 ;;
-              build_failed|update_failed|canceled|deactivated)
-                echo "::error::deploy ended with status: $STATUS"; exit 1 ;;
-            esac
+            if RESP="$(api GET "/services/$RENDER_DEV_SERVICE_ID/deploys/$DEPLOY_ID" 2>"$API_ERR")"; then
+              CONSECUTIVE=0
+              STATUS="$(echo "$RESP" | jq -r '.status')"
+              echo "poll $i/30: ${STATUS:-<no status>}"
+              case "$STATUS" in
+                live) echo "deploy is live"; exit 0 ;;
+                build_failed|update_failed|canceled|deactivated)
+                  echo "::error::deploy ended with status: $STATUS"; exit 1 ;;
+              esac
+            else
+              CONSECUTIVE=$((CONSECUTIVE + 1))
+              echo "poll $i/30: API call failed (consecutive $CONSECUTIVE/3) — helper output:"
+              cat "$API_ERR"
+              if [[ "$CONSECUTIVE" -ge 3 ]]; then
+                echo "::error::deploy poll gave up after 3 consecutive API failures — last response:"
+                cat "$API_ERR"
+                exit 1
+              fi
+            fi
             sleep 20
           done
           echo "::error::deploy poll timed out (10 min cap)"; exit 1
 
-      # Health validation: HTTP 200 (`-f`) AND the EXACT body
-      # {"status":"ok"} (exact-byte assert, no jq). 30 x 20 s absorbs the
-      # ~1 min free-tier cold start. The workflow goes RED if this fails.
+      # Health validation: HTTP 200 AND the EXACT body {"status":"ok"}
+      # (exact-byte assert, no jq). 30 x 20 s absorbs the ~1 min free-tier
+      # cold start. Status + body are captured per attempt (no -f); on giving
+      # up the LAST observed status/body is printed before the step goes red.
       - name: Health validation
         if: steps.cfg.outputs.configured == 'true'
         run: |
+          LAST=""
           for i in $(seq 1 30); do
-            body=$(curl -fsS --max-time 10 "$DEV_HEALTH_URL" || true)
-            if [[ "$body" == '{"status":"ok"}' ]]; then echo "health ok (attempt $i)"; exit 0; fi
+            RESP="$(curl -sS -w '\nHTTP_STATUS:%{http_code}' --max-time 10 "$DEV_HEALTH_URL" 2>/dev/null || true)"
+            STATUS="${RESP##*$'\n'}"; STATUS="${STATUS#HTTP_STATUS:}"
+            BODY="${RESP%$'\n'*}"
+            if [[ "$STATUS" == "200" && "$BODY" == '{"status":"ok"}' ]]; then
+              echo "health ok (attempt $i)"; exit 0
+            fi
+            LAST="HTTP ${STATUS:-<transport failure>} body: $BODY"
             sleep 20
           done
-          echo "::error::health validation failed"; exit 1
+          echo "::error::health validation failed — last observed: $LAST"; exit 1
 
       - name: Final summary
         if: steps.cfg.outputs.configured == 'true'

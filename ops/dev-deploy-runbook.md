@@ -82,11 +82,59 @@ push main → CI green → workflow_run (CI completed, branches [main])
   → meta job builds tags (UTC clock + short sha)
   → push-ghcr: build ONCE, push ghcr.io/lucapug/clown-circus-reloaded
       :<YYYYMMDD-HHMMSS-<shortsha>>  (immutable)  +  :main  (moving)
-  → deploy-dev: PATCH Render service (image + OTEL service.version=<shortsha>)
+  → deploy-dev: GET /owners → ownerId
+      → PATCH service  {image:{ownerId, imagePath}}          (image switch)
+      → GET/PUT /env-vars  (OTEL service.version=<shortsha>; all other
+        vars — DATABASE_URL above all — preserved byte-for-byte)
       → POST /deploys → poll to "live" (30 x 20 s cap) → poll GET /health
         until the EXACT body {"status":"ok"} (30 x 20 s cap)
   → green; any validation failure goes red
 ```
+
+### Render API semantics (as implemented for issue #52)
+
+Recorded here because the first configured CD run (2026-10-22) failed with a
+Render **HTTP 400** whose error body the old workflow swallowed. These are
+the "stated, not invented" facts, verified against `api-docs.render.com`
+before the fix:
+
+- **`envVars` is NOT a servicePATCH field.** It exists only on service
+  creation. Existing env vars are managed by the bulk endpoint
+  `PUT /v1/services/{serviceId}/env-vars`, which REPLACES the whole list —
+  so the workflow GETs the current list first and PUTs it back with exactly
+  one change (`OTEL_RESOURCE_ATTRIBUTES` gains
+  `service.version=<shortsha>`).
+- **The GET list shape is wrapped and cursor-paginated:** items are
+  `{"cursor": …, "envVar": {"key": …, "value": …}}`; pass the last item's
+  `cursor` as the `cursor` query parameter until it comes back null. The
+  workflow reduces pages to a plain `[{key, value}]` array with jq.
+- **The servicePATCH `image` object requires BOTH `ownerId` and
+  `imagePath`**, and the `ownerId` must match the service's owner
+  (workspace). The workflow fetches it at run time from `GET /v1/owners`
+  with the API key and takes the single returned owner — no new
+  secrets/variables needed. If the account ever gains a second owner
+  (team), the step fails loudly listing them.
+- **The GHCR package must be PUBLIC** — Render pulls it with no registry
+  credential configured (deliberate recommendation). A private package
+  would additionally need a Render registry credential.
+- **Ordering: PATCH image → PUT env-vars → POST deploy → poll `live` →
+  `/health`.** Render serializes deploys per service; the PATCH and the
+  env-vars PUT can enqueue intermediate auto-deploys, and the later explicit
+  POST **supersedes** them (they are canceled). Only the final explicit
+  deploy — carrying both the new image and the new environment — must reach
+  `live`.
+- **Error visibility:** every call uses
+  `curl -sS -w '\nHTTP_STATUS:%{http_code}'` into a variable; the status is
+  logged WITH Render's response body in the log — no `-f`-and-swallow
+  anywhere (that is what turned the first 400 into a mystery). A non-2xx
+  fails the step immediately in every step except the deploy-status poll:
+  there, a transient api failure (transport or non-2xx) fails only the
+  ATTEMPT with the helper's status+body printed (a successful call resets
+  the counter), and the step gives up RED on 3 CONSECUTIVE failures or the
+  10-min cap; terminal deploy statuses
+  (`build_failed`/`update_failed`/`canceled`/`deactivated`) fail it
+  immediately. On success paths only env var KEY NAMES are printed — never
+  values (`DATABASE_URL` included).
 
 The tag format is deterministic: `YYYYMMDD-HHMMSS-<shortsha>` from the UTC
 clock and the `main` commit sha (example: `20261022-141503-1a2b3c4`). The
@@ -128,10 +176,12 @@ Redeploy the previous immutable tag:
 - **Click path**: Render dashboard → dev service → **Deploys** → select the
   previous immutable deploy → **Redeploy** (with the image-tag dropdown when
   the service is image-backed).
-- **API path**: re-PATCH `image.imagePath` to the previous
-  `YYYYMMDD-HHMMSS-<shortsha>` tag, then `POST
-  /v1/services/<service-id>/deploys` — exactly the workflow's own two calls.
-  Find previous tags via `gh api /users/lucapug/packages/container/clown-circus-reloaded/versions`
+- **API path**: `PATCH` the service with
+  `{"image":{"ownerId":"<owner id from GET /v1/owners>","imagePath":"<previous YYYYMMDD-HHMMSS-<shortsha> tag>"}}`
+  (both fields are required — see "Render API semantics" above), then
+  `POST /v1/services/<service-id>/deploys` — exactly the workflow's own
+  calls. Find previous tags via
+  `gh api /users/lucapug/packages/container/clown-circus-reloaded/versions`
   or the `push-ghcr` job summaries.
 
 Rolling back `service.version` is NOT part of the rollback drill: a stale
@@ -156,9 +206,18 @@ every `push-ghcr`/`deploy-dev` job summary), never the tag alone.
 
 `bash ops/cd-dry-run.sh` replays the deploy path against an inline mock
 Render API: it checks the immutable-tag format, the exact
-`service.version` string in the PATCH body (matching the tag suffix), the
-poll-to-`live` loop, and proves the health assert is exact-byte (it must
-FAIL on a trailing-space body and on HTTP 503).
+`service.version` string in the env-vars PUT body (matching the tag
+suffix), the poll-to-`live` loop, and proves the health assert is
+exact-byte (it must FAIL on a trailing-space body and on HTTP 503). For
+issue #52 it also mocks `GET /owners`, the wrapped cursor-paginated
+env-vars list (with a `DATABASE_URL` entry), and the service PATCH, and
+asserts: the PATCH body is EXACTLY `{image:{ownerId, imagePath}}` and
+nothing else; the env-vars PUT preserves every unrelated key byte-for-byte
+while updating ONLY `OTEL_RESOURCE_ATTRIBUTES` (and ADDS it when absent);
+and a mocked HTTP 400 makes the api helper exit non-zero WITH the response
+body printed. Each of the three #52 checks is mutation-proven — breaking
+the PATCH shape, corrupting an unrelated value, or swallowing the error
+body flips exactly that check red.
 
 ## Rubric note
 
