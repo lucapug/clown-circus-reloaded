@@ -6,7 +6,9 @@
     "dev": "concurrently -n frontend,backend -c cyan,green \"npm run dev:frontend\" \"npm run dev:backend\"",
     "dev:frontend": "npm --prefix frontend run dev",
     "dev:backend": "cd backend && uv run uvicorn app.main:app --reload",
-    "build": "npm --prefix frontend run build"
+    "build": "npm --prefix frontend run build",
+    "test": "concurrently -n frontend,backend -c cyan,green --kill-others-on-fail \"npm --prefix frontend run test\" \"cd backend && uv run pytest\"",
+    "test:integration": "bash ops/test-integration.sh"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
