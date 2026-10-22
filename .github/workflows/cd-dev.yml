@@ -1,0 +1,228 @@
+name: CD dev
+
+# Deploy-on-green to the Render dev service (issue #47).
+#
+# Trigger safety (issue #47 AC1): `workflow_run` fires only when the `CI`
+# workflow (exact `name:` of .github/workflows/ci.yml) completes on `main`
+# (branches filter). PR runs can never trigger this workflow. A
+# failed/cancelled CI run never deploys: the gate on the first job checks
+# `workflow_run.conclusion == 'success'`. `workflow_dispatch` exists only as
+# the manual QA/verification vehicle.
+#
+# Concurrency relay (issue #14 reviewer finding, resolved here): CI's group is
+# `ci-${{ github.ref }}` with cancel-in-progress: true and contains only CI
+# runs. This workflow runs in the DISJOINT group `cd-dev-main` with
+# cancel-in-progress: false (the literal line below is deliberate — do not
+# omit it), so a new CI run can never cancel an in-flight deploy, and
+# back-to-back merges queue CD runs instead of killing the running one
+# (GitHub's concurrency queue holds max 1 pending run; if more queue up the
+# surplus is dropped — acceptable for dev, the next push re-triggers).
+# Therefore .github/workflows/ci.yml needs NO split — zero lines change there.
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cd-dev-main
+  cancel-in-progress: false
+
+env:
+  IMAGE_NAME: ghcr.io/lucapug/clown-circus-reloaded
+  RENDER_API_BASE: https://api.render.com/v1
+  DEV_HEALTH_URL: https://clown-circus-reloaded.onrender.com/health
+
+jobs:
+  # Tag construction: deterministic from UTC clock + full commit sha.
+  # Carries the workflow-level gate so a failed CI run skips everything.
+  meta:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      shortsha: ${{ steps.tags.outputs.shortsha }}
+      immutable: ${{ steps.tags.outputs.immutable }}
+      mainonly: ${{ steps.tags.outputs.mainonly }}
+    steps:
+      - id: tags
+        run: |
+          SHORTSHA="${GITHUB_SHA::7}"
+          IMMUTABLE="$(date -u +%Y%m%d-%H%M%S)-${SHORTSHA}"   # e.g. 20261022-141503-1a2b3c4
+          echo "shortsha=$SHORTSHA"      >> "$GITHUB_OUTPUT"
+          echo "immutable=$IMMUTABLE"    >> "$GITHUB_OUTPUT"
+          echo "mainonly=$([[ $GITHUB_REF == refs/heads/main ]] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
+
+  # Build ONCE, push immutable (+ moving main) tag. `packages: write` is
+  # scoped to THIS job only; deploy-dev gets no packages permission.
+  push-ghcr:
+    needs: meta
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: tags
+        name: Build tag list (moving main tag only on main)
+        run: |
+          {
+            echo "${IMAGE_NAME}:${{ needs.meta.outputs.immutable }}"
+            if [[ "${{ needs.meta.outputs.mainonly }}" == "yes" ]]; then
+              echo "${IMAGE_NAME}:main"
+            fi
+          } >> "$GITHUB_OUTPUT"
+
+      # Single build+push of both tags; the deploy job reuses this tag and
+      # never rebuilds.
+      - uses: docker/build-push-action@v6
+        id: push
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+
+      - name: Record image in job summary
+        run: |
+          {
+            echo "### GHCR push"
+            echo ""
+            echo "Image: ${IMAGE_NAME}:${{ needs.meta.outputs.immutable }}"
+            echo "Digest: ${{ steps.push.outputs.digest }}"
+            echo "Moving tag \`main\`: ${{ needs.meta.outputs.mainonly == 'yes' && 'pushed' || 'skipped (not main)' }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Deploy the exact pushed image to the Render dev service and validate
+  # health. Degrades to a green no-op with a loud notice while
+  # RENDER_API_KEY (secret) / RENDER_DEV_SERVICE_ID (repo variable) are unset.
+  deploy-dev:
+    needs: [meta, push-ghcr]
+    runs-on: ubuntu-latest
+    steps:
+      # GitHub's `secrets` context is unavailable in job-level `if:`, so the
+      # configured/not-configured decision is made here at step level.
+      - id: cfg
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_DEV_SERVICE_ID: ${{ vars.RENDER_DEV_SERVICE_ID }}
+        run: |
+          if [[ -n "$RENDER_API_KEY" && -n "$RENDER_DEV_SERVICE_ID" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Record image info in job summary
+        run: |
+          {
+            echo "### CD dev deploy"
+            echo ""
+            echo "Image: ${IMAGE_NAME}:${{ needs.meta.outputs.immutable }}"
+            echo "Digest: ${{ needs.push-ghcr.outputs.digest }}"
+            echo "service.version=${{ needs.meta.outputs.shortsha }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: CD not configured — skip deploy, stay green
+        if: steps.cfg.outputs.configured != 'true'
+        run: |
+          echo "::notice::CD not configured — set RENDER_API_KEY and RENDER_DEV_SERVICE_ID"
+          {
+            echo "### CD not configured — set RENDER_API_KEY and RENDER_DEV_SERVICE_ID"
+            echo ""
+            echo "(GHCR push above still ran; deploy skipped, job stays green)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # ONE API call carries BOTH the image reference and service.version
+      # (short sha). NOTE: this replaces the dev service's current
+      # OTEL_RESOURCE_ATTRIBUTES (current value: deployment.environment.name=dev
+      # per the 2026-10-21 Render env work). If PATCHing envVars auto-triggers
+      # a Render deploy, the POST below returns a queued duplicate deploy of
+      # the same image — harmless; observe on first real run.
+      - name: PATCH service image + service.version
+        if: steps.cfg.outputs.configured == 'true'
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_DEV_SERVICE_ID: ${{ vars.RENDER_DEV_SERVICE_ID }}
+        run: |
+          OTEL="deployment.environment.name=dev,service.version=${{ needs.meta.outputs.shortsha }}"
+          BODY=$(jq -n --arg img "${IMAGE_NAME}:${{ needs.meta.outputs.immutable }}" --arg otel "$OTEL" \
+            '{image:{imagePath:$img},envVars:[{key:"OTEL_RESOURCE_ATTRIBUTES",value:$otel}]}')
+          curl -fsS -X PATCH \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$BODY" \
+            "${RENDER_API_BASE}/services/$RENDER_DEV_SERVICE_ID" > /dev/null
+
+      - name: POST deploy of the immutable image
+        id: deploy
+        if: steps.cfg.outputs.configured == 'true'
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_DEV_SERVICE_ID: ${{ vars.RENDER_DEV_SERVICE_ID }}
+        run: |
+          RESP=$(curl -fsS -X POST \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg img "${IMAGE_NAME}:${{ needs.meta.outputs.immutable }}" '{imageUrl:$img}')" \
+            "${RENDER_API_BASE}/services/$RENDER_DEV_SERVICE_ID/deploys")
+          DEPLOY_ID=$(echo "$RESP" | jq -r '.id')
+          echo "deploy_id=$DEPLOY_ID" >> "$GITHUB_OUTPUT"
+
+      # Bounded poll: 30 attempts x 20 s = 10 min cap. Timeout is RED.
+      - name: Poll deploy status until live
+        if: steps.cfg.outputs.configured == 'true'
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_DEV_SERVICE_ID: ${{ vars.RENDER_DEV_SERVICE_ID }}
+        run: |
+          for i in $(seq 1 30); do
+            STATUS=$(curl -fsS -H "Authorization: Bearer $RENDER_API_KEY" \
+              "${RENDER_API_BASE}/services/$RENDER_DEV_SERVICE_ID/deploys/${{ steps.deploy.outputs.deploy_id }}" \
+              | jq -r '.status' 2>/dev/null || true)
+            echo "poll $i/30: ${STATUS:-<no response>}"
+            case "$STATUS" in
+              live) echo "deploy is live"; exit 0 ;;
+              build_failed|update_failed|canceled|deactivated)
+                echo "::error::deploy ended with status: $STATUS"; exit 1 ;;
+            esac
+            sleep 20
+          done
+          echo "::error::deploy poll timed out (10 min cap)"; exit 1
+
+      # Health validation: HTTP 200 (`-f`) AND the EXACT body
+      # {"status":"ok"} (exact-byte assert, no jq). 30 x 20 s absorbs the
+      # ~1 min free-tier cold start. The workflow goes RED if this fails.
+      - name: Health validation
+        if: steps.cfg.outputs.configured == 'true'
+        run: |
+          for i in $(seq 1 30); do
+            body=$(curl -fsS --max-time 10 "$DEV_HEALTH_URL" || true)
+            if [[ "$body" == '{"status":"ok"}' ]]; then echo "health ok (attempt $i)"; exit 0; fi
+            sleep 20
+          done
+          echo "::error::health validation failed"; exit 1
+
+      - name: Final summary
+        if: steps.cfg.outputs.configured == 'true'
+        env:
+          RENDER_DEV_SERVICE_ID: ${{ vars.RENDER_DEV_SERVICE_ID }}
+        run: |
+          {
+            echo "### Deployed to dev"
+            echo ""
+            echo "- Image: ${IMAGE_NAME}:${{ needs.meta.outputs.immutable }}"
+            echo "- Digest: ${{ needs.push-ghcr.outputs.digest }}"
+            echo "- service.version=${{ needs.meta.outputs.shortsha }}"
+            echo "- Deploy: https://dashboard.render.com/web/$RENDER_DEV_SERVICE_ID"
+          } >> "$GITHUB_STEP_SUMMARY"
