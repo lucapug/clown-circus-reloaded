@@ -9,7 +9,9 @@
     "lint": "eslint .",
     "test": "vitest run",
     "replay": "vitest run src/game/recorder/__tests__/replayTrace.cli.test.ts",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:e2e": "playwright test",
+    "test:prod-gating": "npm run build && bash e2e/check-prod-gating.sh"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -17,6 +19,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",
+    "@playwright/test": "^1.64.1",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",

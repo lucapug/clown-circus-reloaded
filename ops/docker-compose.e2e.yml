@@ -1,0 +1,12 @@
+# E2E-stack overlay (issue #46). Used ONLY with the isolated compose project:
+#   docker compose -p clown-circus-e2e -f docker-compose.yml -f ops/docker-compose.test.yml -f ops/docker-compose.e2e.yml ...
+# Reuses ops/docker-compose.test.yml's isolated loopback ports (app 18000,
+# db 15432 — the #45 mechanics, the owner's dev stack on 8000/5432 is never
+# touched) and re-points the CORS allow-list at the Playwright dev-server
+# origin :4300 (a later overlay file wins the per-key environment merge over
+# the test overlay's vitest/jsdom :3000 list). The E2E frontend never uses
+# :5173 (issue #46 constraint).
+services:
+  app:
+    environment:
+      CORS_ORIGINS: "http://localhost:4300,http://127.0.0.1:4300"

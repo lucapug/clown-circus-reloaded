@@ -21,3 +21,7 @@ backend/clowncircus.db
 # Editor
 .idea/
 .vscode/
+
+# Playwright artifacts (issue #46)
+frontend/test-results/
+frontend/playwright-report/
