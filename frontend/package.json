@@ -10,7 +10,8 @@
     "test": "vitest run",
     "replay": "vitest run src/game/recorder/__tests__/replayTrace.cli.test.ts",
     "preview": "vite preview",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:prod-gating": "npm run build && bash e2e/check-prod-gating.sh"
   },
   "dependencies": {
     "react": "^18.3.1",
