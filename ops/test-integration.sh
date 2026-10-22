@@ -5,7 +5,8 @@
 # `clown-circus-it`, loopback host ports 18000/15432) -> health poll -> the
 # frontend live-integration vitest file (LEADERBOARD_INTEGRATION_URL set here,
 # no manual env fiddling) -> the FULL backend pytest suite against the stack's
-# Postgres (IT_DATABASE_URL) -> guaranteed `down -v` teardown via EXIT trap
+# Postgres (IT_DATABASE_URL + DATABASE_URL, so the app lifespan under test also
+# targets the same Postgres) -> guaranteed `down -v` teardown via EXIT trap
 # (runs even on failure or Ctrl-C).
 #
 # Requires: docker, bash, curl, uv, node (see README "Testing").
@@ -56,7 +57,9 @@ echo "[test-integration] 4/5 frontend integration file (LEADERBOARD_INTEGRATION_
 echo "[test-integration] 5/5 backend suite vs Postgres (IT_DATABASE_URL=$IT_DB_URL)"
 (
   cd backend
-  IT_DATABASE_URL="$IT_DB_URL" uv run pytest
+  # DATABASE_URL too: create_app()'s lifespan then resolves the same Postgres
+  # instead of booting a default SQLite file alongside the fixture's engine.
+  IT_DATABASE_URL="$IT_DB_URL" DATABASE_URL="$IT_DB_URL" uv run pytest
 )
 
 echo "[test-integration] all green"
