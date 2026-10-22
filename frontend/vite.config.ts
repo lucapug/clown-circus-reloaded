@@ -6,7 +6,7 @@
 // eslint-disable-next-line @typescript-eslint/triple-slash-reference
 /// <reference path="./src/vite-env.d.ts" />
 import { execSync } from 'node:child_process'
-import { defineConfig } from 'vite'
+import { configDefaults, defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 
 // Issue #30: the app git sha baked into recorded session headers — traces
@@ -25,5 +25,10 @@ export default defineConfig({
   plugins: [react()],
   define: {
     __APP_GIT_SHA__: JSON.stringify(gitSha),
+  },
+  test: {
+    // Issue #46: the Playwright specs live in e2e/ — vitest's default include
+    // matches *.spec.ts and would collect them alongside the unit suite.
+    exclude: [...configDefaults.exclude, 'e2e/**'],
   },
 })
