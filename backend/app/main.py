@@ -15,7 +15,7 @@ from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from opentelemetry.sdk._logs import LoggingHandler
 
@@ -67,6 +67,11 @@ def create_app() -> FastAPI:
     def health() -> HealthStatus:
         logger.info("health check ok")
         return HealthStatus(status="ok")
+
+    # Answer Render's HEAD / pre-check quietly (2026-10-21 logs showed 405).
+    @app.head("/", include_in_schema=False)
+    def head_index() -> Response:
+        return Response(status_code=200)
 
     if DIST_DIR.is_dir():
         app.mount(

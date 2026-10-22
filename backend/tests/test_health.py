@@ -10,3 +10,11 @@ def test_health_returns_ok() -> None:
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_head_root_returns_200_empty_body() -> None:
+    """HEAD / answers Render's pre-check (issue #47) instead of 405."""
+    client = TestClient(create_app())
+    response = client.head("/")
+    assert response.status_code == 200
+    assert response.content == b""
