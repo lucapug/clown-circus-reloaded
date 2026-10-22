@@ -125,9 +125,15 @@ before the fix:
   `live`.
 - **Error visibility:** every call uses
   `curl -sS -w '\nHTTP_STATUS:%{http_code}'` into a variable; the status is
-  logged and any non-2xx fails the step WITH Render's response body in the
-  log. No `-f`-and-swallow anywhere (that is what turned the first 400 into
-  a mystery). On success paths only env var KEY NAMES are printed — never
+  logged WITH Render's response body in the log — no `-f`-and-swallow
+  anywhere (that is what turned the first 400 into a mystery). A non-2xx
+  fails the step immediately in every step except the deploy-status poll:
+  there, a transient api failure (transport or non-2xx) fails only the
+  ATTEMPT with the helper's status+body printed (a successful call resets
+  the counter), and the step gives up RED on 3 CONSECUTIVE failures or the
+  10-min cap; terminal deploy statuses
+  (`build_failed`/`update_failed`/`canceled`/`deactivated`) fail it
+  immediately. On success paths only env var KEY NAMES are printed — never
   values (`DATABASE_URL` included).
 
 The tag format is deterministic: `YYYYMMDD-HHMMSS-<shortsha>` from the UTC
