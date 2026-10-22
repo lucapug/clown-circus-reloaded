@@ -1,0 +1,385 @@
+name: CD promote to prod
+
+# Manual promotion of an immutable GHCR tag to the Render prod service
+# (issue #48).
+#
+# Trigger safety: `workflow_dispatch` ONLY — nothing auto-deploys prod,
+# ever. No `push`, no `workflow_run`, no `schedule`.
+#
+# Promotion identity is the DIGEST, not the tag (runbook rule: GHCR tags
+# are MUTABLE — tags are unique-by-convention only). The workflow resolves
+# the digest of the requested tag LIVE from GHCR anonymously BEFORE any
+# Render call: a tag not present in GHCR fails fast, and an optional
+# `expected_digest` input (copied from the dev CD run summary) makes the
+# dev↔prod byte-equality explicit — a mismatch fails the run before
+# Render is touched.
+#
+# First-switch expectation: the FIRST promotion PATCHes prod from
+# repo-build to image mode (exactly like the dev switch, run 39762394105),
+# and Render may queue multiple serialized deploys for that switch — hence
+# the 45 x 20 s poll cap (15 min) vs the 10-min dev cap. Steady-state
+# promotions settle in ~3 min.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Immutable tag from the dev CD run summary, e.g. 20261022-102048-84d7ba4'
+        required: true
+        type: string
+      expected_digest:
+        description: 'Optional sha256 digest from the same dev run summary; promotion fails before touching Render on mismatch'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cd-promote-prod
+  cancel-in-progress: false   # a second promotion QUEUES; never cancels an in-flight prod deploy
+
+env:
+  IMAGE_NAME: ghcr.io/lucapug/clown-circus-reloaded
+  RENDER_API_BASE: https://api.render.com/v1
+  PROD_HEALTH_URL: ${{ vars.PROD_HEALTH_URL || 'https://clown-circus-reloaded-prod.onrender.com/health' }}
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag }}
+      EXPECTED_DIGEST: ${{ inputs.expected_digest }}
+    steps:
+      # Step 1 — fail fast on a malformed tag BEFORE any network call.
+      - name: Tag-format gate
+        run: |
+          if [[ ! "$TAG" =~ ^[0-9]{8}-[0-9]{6}-[0-9a-f]{7}$ ]]; then
+            echo "::error::tag '$TAG' does not match YYYYMMDD-HHMMSS-<shortsha> — refusing to promote"; exit 1
+          fi
+          echo "SHORTSHA=${TAG##*-}" >> "$GITHUB_ENV"
+
+      # Step 2 — resolve the CURRENT digest of <tag> anonymously (the
+      # package is PUBLIC; #47 evidence). The Accept set MUST include the
+      # OCI-index and Docker manifest-list types so `Docker-Content-Digest`
+      # equals the TOP-LEVEL index digest that docker/build-push-action
+      # printed in the dev summary; with a narrower Accept set the registry
+      # resolves a platform manifest and the digests spuriously "mismatch".
+      - name: Resolve current digest from GHCR (anonymous, fail fast on absent tag)
+        run: |
+          REPO_PATH="lucapug/clown-circus-reloaded"
+          TOKEN="$(curl -sS "https://ghcr.io/token?scope=repository:${REPO_PATH}:pull" | jq -r '.token')"
+          if [[ -z "$TOKEN" || "$TOKEN" == "null" ]]; then
+            echo "::error::could not obtain anonymous GHCR pull token"; exit 1
+          fi
+          ACCEPT='application/vnd.docker.distribution.manifest.v2+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json'
+          RESP="$(curl -sS -D "$RUNNER_TEMP/manifest-headers.txt" -o "$RUNNER_TEMP/manifest-body.json" \
+            -w '\nHTTP_STATUS:%{http_code}' \
+            -H "Authorization: Bearer $TOKEN" -H "Accept: $ACCEPT" \
+            "https://ghcr.io/v2/${REPO_PATH}/manifests/${TAG}")"
+          STATUS="${RESP##*$'\n'}"; STATUS="${STATUS#HTTP_STATUS:}"
+          if [[ "$STATUS" == "404" ]]; then
+            echo "::error::tag ${TAG} not present in GHCR — refusing to promote"; exit 1
+          fi
+          if [[ ! "$STATUS" =~ ^2[0-9][0-9]$ ]]; then
+            echo "::error::GHCR manifest request for ${TAG} failed (HTTP ${STATUS}) — response body follows:" >&2
+            cat "$RUNNER_TEMP/manifest-body.json" >&2
+            exit 1
+          fi
+          DIGEST="$(grep -i '^docker-content-digest:' "$RUNNER_TEMP/manifest-headers.txt" | tail -1 | tr -d '\r' | awk '{print $2}')"
+          if [[ -z "$DIGEST" ]]; then
+            echo "::error::GHCR response carried no Docker-Content-Digest header — cannot establish promotion identity"; exit 1
+          fi
+          echo "resolved digest of ${TAG}: ${DIGEST}"
+          echo "RESOLVED_DIGEST=${DIGEST}" >> "$GITHUB_ENV"
+
+      # Step 3 — expected_digest gate (#49 digest rule made operational):
+      # a mismatch exits here, BEFORE any Render call.
+      - name: expected_digest gate (before ANY Render call)
+        if: inputs.expected_digest != ''
+        run: |
+          EXPECTED="$(echo "$EXPECTED_DIGEST" | tr -d '[:space:]')"
+          EXPECTED="${EXPECTED#sha256:}"
+          RESOLVED="${RESOLVED_DIGEST#sha256:}"
+          if [[ "$EXPECTED" != "$RESOLVED" ]]; then
+            echo "::error::expected_digest mismatch — refusing to promote BEFORE touching Render"
+            echo "  expected: sha256:${EXPECTED}"
+            echo "  resolved: ${RESOLVED_DIGEST}"
+            exit 1
+          fi
+          echo "expected_digest matched ${RESOLVED_DIGEST}"
+
+      # Step 4 — promotion identity summary (AC: digest equality dev↔prod).
+      - name: Record promotion identity in job summary
+        run: |
+          VERDICT="$([[ -n "$EXPECTED_DIGEST" ]] && echo matched || echo 'not provided')"
+          {
+            echo "### Promotion identity (resolved BEFORE touching Render)"
+            echo ""
+            echo "- Tag: ${TAG}"
+            echo "- Digest (resolved live from GHCR at dispatch time): ${RESOLVED_DIGEST}"
+            echo "- expected_digest: ${VERDICT}"
+            echo ""
+            echo "The promoted digest above is byte-identical to the digest the dev CD run summary printed for this tag — the SAME immutable image validated on dev is promoted to prod."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Step 5 — Render owners fetch. The `api` helper is identical to
+      # cd-dev.yml (status capture via -w, body always in reach, non-2xx
+      # fails LOUDLY with the body printed; diagnostics to stderr).
+      - name: Fetch workspace ownerId (GET /owners)
+        id: owner
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_PROD_SERVICE_ID: ${{ vars.RENDER_PROD_SERVICE_ID }}
+        run: |
+          if [[ -z "$RENDER_API_KEY" ]]; then
+            echo "::error::RENDER_API_KEY is not set — cannot promote"; exit 1
+          fi
+          if [[ -z "$RENDER_PROD_SERVICE_ID" ]]; then
+            echo "::error::repo variable RENDER_PROD_SERVICE_ID is not set — cannot promote"; exit 1
+          fi
+          api() {
+            local method="$1" path="$2" body="${3:-}"
+            local args=(-sS -w '\nHTTP_STATUS:%{http_code}' -X "$method" -H "Authorization: Bearer $RENDER_API_KEY" -H "Content-Type: application/json")
+            if [[ -n "$body" ]]; then args+=(-d "$body"); fi
+            local resp status payload
+            if ! resp="$(curl "${args[@]}" "${RENDER_API_BASE}${path}")"; then
+              echo "::error::curl transport failure on $method $path" >&2; exit 1
+            fi
+            status="${resp##*$'\n'}"; status="${status#HTTP_STATUS:}"
+            payload="${resp%$'\n'*}"
+            echo "render $method $path -> HTTP $status" >&2
+            if [[ ! "$status" =~ ^2[0-9][0-9]$ ]]; then
+              echo "::error::Render API $method $path failed (HTTP $status) — response body follows:" >&2
+              printf '%s\n' "$payload" >&2
+              exit 1
+            fi
+            printf '%s\n' "$payload"
+          }
+          OWNERS_JSON="$(api GET /owners)"
+          N="$(echo "$OWNERS_JSON" | jq 'length')"
+          if [[ "$N" -ne 1 ]]; then
+            echo "::error::expected exactly 1 owner (one-workspace account), got $N:" >&2
+            echo "$OWNERS_JSON" | jq -r '.[] | "  \(.id) — \(.name // .email // "?")"' >&2
+            exit 1
+          fi
+          OWNER_ID="$(echo "$OWNERS_JSON" | jq -r '.[0].id')"
+          echo "owner_id=$OWNER_ID" >> "$GITHUB_OUTPUT"
+
+      # Step 6 — servicePATCH requires EXACTLY image.ownerId +
+      # image.imagePath, nothing else (`envVars` is not a servicePATCH
+      # field — issue #52).
+      - name: PATCH prod service image (ownerId + imagePath only)
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_PROD_SERVICE_ID: ${{ vars.RENDER_PROD_SERVICE_ID }}
+          OWNER_ID: ${{ steps.owner.outputs.owner_id }}
+        run: |
+          api() {
+            local method="$1" path="$2" body="${3:-}"
+            local args=(-sS -w '\nHTTP_STATUS:%{http_code}' -X "$method" -H "Authorization: Bearer $RENDER_API_KEY" -H "Content-Type: application/json")
+            if [[ -n "$body" ]]; then args+=(-d "$body"); fi
+            local resp status payload
+            if ! resp="$(curl "${args[@]}" "${RENDER_API_BASE}${path}")"; then
+              echo "::error::curl transport failure on $method $path" >&2; exit 1
+            fi
+            status="${resp##*$'\n'}"; status="${status#HTTP_STATUS:}"
+            payload="${resp%$'\n'*}"
+            echo "render $method $path -> HTTP $status" >&2
+            if [[ ! "$status" =~ ^2[0-9][0-9]$ ]]; then
+              echo "::error::Render API $method $path failed (HTTP $status) — response body follows:" >&2
+              printf '%s\n' "$payload" >&2
+              exit 1
+            fi
+            printf '%s\n' "$payload"
+          }
+          BODY="$(jq -n --arg owner "$OWNER_ID" \
+            --arg img "${IMAGE_NAME}:${TAG}" \
+            '{image: {ownerId: $owner, imagePath: $img}}')"
+          api PATCH "/services/$RENDER_PROD_SERVICE_ID" "$BODY" > /dev/null
+
+      # Step 7 — service.version per deploy via the bulk env-vars endpoint
+      # (issue #52): GET the full cursor-paginated list, jq-update ONLY
+      # OTEL_RESOURCE_ATTRIBUTES — every other key/value, DATABASE_URL
+      # above all, passes through byte-for-byte — then PUT the complete
+      # list back. Only KEY NAMES are ever printed; values (the prod Neon
+      # URL) never.
+      - name: Update OTEL_RESOURCE_ATTRIBUTES via env-vars endpoint
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_PROD_SERVICE_ID: ${{ vars.RENDER_PROD_SERVICE_ID }}
+        run: |
+          api() {
+            local method="$1" path="$2" body="${3:-}"
+            local args=(-sS -w '\nHTTP_STATUS:%{http_code}' -X "$method" -H "Authorization: Bearer $RENDER_API_KEY" -H "Content-Type: application/json")
+            if [[ -n "$body" ]]; then args+=(-d "$body"); fi
+            local resp status payload
+            if ! resp="$(curl "${args[@]}" "${RENDER_API_BASE}${path}")"; then
+              echo "::error::curl transport failure on $method $path" >&2; exit 1
+            fi
+            status="${resp##*$'\n'}"; status="${status#HTTP_STATUS:}"
+            payload="${resp%$'\n'*}"
+            echo "render $method $path -> HTTP $status" >&2
+            if [[ ! "$status" =~ ^2[0-9][0-9]$ ]]; then
+              echo "::error::Render API $method $path failed (HTTP $status) — response body follows:" >&2
+              printf '%s\n' "$payload" >&2
+              exit 1
+            fi
+            printf '%s\n' "$payload"
+          }
+          CURSOR=""
+          : > "$RUNNER_TEMP/env-vars.jsonl"
+          while :; do
+            EP="/services/$RENDER_PROD_SERVICE_ID/env-vars?limit=100"
+            if [[ -n "$CURSOR" ]]; then
+              EP="${EP}&cursor=$(jq -rn --arg c "$CURSOR" '$c|@uri')"
+            fi
+            PAGE="$(api GET "$EP")"
+            echo "$PAGE" | jq -c '.[].envVar' >> "$RUNNER_TEMP/env-vars.jsonl"
+            CURSOR="$(echo "$PAGE" | jq -r '.[-1].cursor // empty')"
+            if [[ -z "$CURSOR" ]]; then break; fi
+          done
+          CURRENT="$(jq -s '.' "$RUNNER_TEMP/env-vars.jsonl")"   # one flat [{key,value}, ...]
+          echo "fetched env var keys: $(echo "$CURRENT" | jq -r 'map(.key) | join(", ")')"
+          NEW_OTEL="deployment.environment.name=prod,service.version=${SHORTSHA}"
+          UPDATED="$(echo "$CURRENT" | jq --arg k OTEL_RESOURCE_ATTRIBUTES --arg v "$NEW_OTEL" '
+            if any(.[]; .key == $k)
+            then map(if .key == $k then .value = $v else . end)
+            else . + [{"key": $k, "value": $v}] end')"
+          if ! echo "$UPDATED" | jq -e --arg v "$NEW_OTEL" '
+            (any(.[]; .key == "DATABASE_URL")) and
+            (any(.[]; .key == "OTEL_RESOURCE_ATTRIBUTES" and .value == $v))' > /dev/null; then
+            echo "::error::env-vars PUT body failed post-conditions (DATABASE_URL present + new OTEL value)" >&2
+            echo "keys in PUT body: $(echo "$UPDATED" | jq -r 'map(.key) | join(", ")')" >&2
+            exit 1
+          fi
+          api PUT "/services/$RENDER_PROD_SERVICE_ID/env-vars" "$UPDATED" > /dev/null
+          echo "env-vars updated: OTEL_RESOURCE_ATTRIBUTES=$NEW_OTEL (all other keys preserved)"
+
+      # Step 8 — the explicit deploy carries BOTH the new image and the
+      # new environment (later POST supersedes intermediate auto-deploys
+      # enqueued by the PATCH/PUT — issue #52).
+      - name: POST deploy of the promoted image
+        id: deploy
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_PROD_SERVICE_ID: ${{ vars.RENDER_PROD_SERVICE_ID }}
+        run: |
+          api() {
+            local method="$1" path="$2" body="${3:-}"
+            local args=(-sS -w '\nHTTP_STATUS:%{http_code}' -X "$method" -H "Authorization: Bearer $RENDER_API_KEY" -H "Content-Type: application/json")
+            if [[ -n "$body" ]]; then args+=(-d "$body"); fi
+            local resp status payload
+            if ! resp="$(curl "${args[@]}" "${RENDER_API_BASE}${path}")"; then
+              echo "::error::curl transport failure on $method $path" >&2; exit 1
+            fi
+            status="${resp##*$'\n'}"; status="${status#HTTP_STATUS:}"
+            payload="${resp%$'\n'*}"
+            echo "render $method $path -> HTTP $status" >&2
+            if [[ ! "$status" =~ ^2[0-9][0-9]$ ]]; then
+              echo "::error::Render API $method $path failed (HTTP $status) — response body follows:" >&2
+              printf '%s\n' "$payload" >&2
+              exit 1
+            fi
+            printf '%s\n' "$payload"
+          }
+          BODY="$(jq -n --arg img "${IMAGE_NAME}:${TAG}" '{imageUrl:$img}')"
+          RESP="$(api POST "/services/$RENDER_PROD_SERVICE_ID/deploys" "$BODY")"
+          DEPLOY_ID="$(echo "$RESP" | jq -r '.id')"
+          if [[ -z "$DEPLOY_ID" || "$DEPLOY_ID" == "null" ]]; then
+            echo "::error::POST deploy returned no deploy id" >&2; exit 1
+          fi
+          echo "deploy_id=$DEPLOY_ID" >> "$GITHUB_OUTPUT"
+
+      # Step 9 — bounded poll: 45 attempts x 20 s = 15 min cap. Why 45 not
+      # 30: the FIRST promotion switches prod repo→image and can queue
+      # multiple serialized deploys — the dev first switch overran a
+      # 10-min cap on 2026-10-22; steady state is ~3 min. Timeout is RED.
+      # Transient API errors (429/5xx/transport) fail the ATTEMPT, not the
+      # step: the helper's status+body output is captured and shown per
+      # attempt, a successful call resets the counter, and only 3
+      # CONSECUTIVE failures give up RED with the last body. Terminal deploy
+      # statuses and the cap are unaffected.
+      - name: Poll deploy status until live
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_PROD_SERVICE_ID: ${{ vars.RENDER_PROD_SERVICE_ID }}
+          DEPLOY_ID: ${{ steps.deploy.outputs.deploy_id }}
+        run: |
+          api() {
+            local method="$1" path="$2" body="${3:-}"
+            local args=(-sS -w '\nHTTP_STATUS:%{http_code}' -X "$method" -H "Authorization: Bearer $RENDER_API_KEY" -H "Content-Type: application/json")
+            if [[ -n "$body" ]]; then args+=(-d "$body"); fi
+            local resp status payload
+            if ! resp="$(curl "${args[@]}" "${RENDER_API_BASE}${path}")"; then
+              echo "::error::curl transport failure on $method $path" >&2; exit 1
+            fi
+            status="${resp##*$'\n'}"; status="${status#HTTP_STATUS:}"
+            payload="${resp%$'\n'*}"
+            echo "render $method $path -> HTTP $status" >&2
+            if [[ ! "$status" =~ ^2[0-9][0-9]$ ]]; then
+              echo "::error::Render API $method $path failed (HTTP $status) — response body follows:" >&2
+              printf '%s\n' "$payload" >&2
+              exit 1
+            fi
+            printf '%s\n' "$payload"
+          }
+          CONSECUTIVE=0
+          API_ERR="$RUNNER_TEMP/poll-api.err"
+          for i in $(seq 1 45); do
+            if RESP="$(api GET "/services/$RENDER_PROD_SERVICE_ID/deploys/$DEPLOY_ID" 2>"$API_ERR")"; then
+              CONSECUTIVE=0
+              STATUS="$(echo "$RESP" | jq -r '.status')"
+              echo "poll $i/45: ${STATUS:-<no status>}"
+              case "$STATUS" in
+                live) echo "deploy is live"; exit 0 ;;
+                build_failed|update_failed|canceled|deactivated)
+                  echo "::error::deploy ended with status: $STATUS"; exit 1 ;;
+              esac
+            else
+              CONSECUTIVE=$((CONSECUTIVE + 1))
+              echo "poll $i/45: API call failed (consecutive $CONSECUTIVE/3) — helper output:"
+              cat "$API_ERR"
+              if [[ "$CONSECUTIVE" -ge 3 ]]; then
+                echo "::error::deploy poll gave up after 3 consecutive API failures — last response:"
+                cat "$API_ERR"
+                exit 1
+              fi
+            fi
+            sleep 20
+          done
+          echo "::error::deploy poll timed out (15 min cap)"; exit 1
+
+      # Step 10 — health validation: HTTP 200 AND the EXACT body
+      # {"status":"ok"} (exact-byte, no jq). 30 x 20 s absorbs the ~1 min
+      # free-tier cold start; on give-up the LAST observed status/body is
+      # printed before the step goes red.
+      - name: Health validation
+        run: |
+          LAST=""
+          for i in $(seq 1 30); do
+            RESP="$(curl -sS -w '\nHTTP_STATUS:%{http_code}' --max-time 10 "$PROD_HEALTH_URL" 2>/dev/null || true)"
+            STATUS="${RESP##*$'\n'}"; STATUS="${STATUS#HTTP_STATUS:}"
+            BODY="${RESP%$'\n'*}"
+            if [[ "$STATUS" == "200" && "$BODY" == '{"status":"ok"}' ]]; then
+              echo "health ok (attempt $i)"; exit 0
+            fi
+            LAST="HTTP ${STATUS:-<transport failure>} body: $BODY"
+            sleep 20
+          done
+          echo "::error::health validation failed — last observed: $LAST"; exit 1
+
+      - name: Final summary
+        env:
+          RENDER_PROD_SERVICE_ID: ${{ vars.RENDER_PROD_SERVICE_ID }}
+        run: |
+          VERDICT="$([[ -n "$EXPECTED_DIGEST" ]] && echo matched || echo 'not provided')"
+          {
+            echo "### Promoted to prod"
+            echo ""
+            echo "- Tag: ${TAG}"
+            echo "- Digest: ${RESOLVED_DIGEST}"
+            echo "- expected_digest: ${VERDICT}"
+            echo "- URL: https://clown-circus-reloaded-prod.onrender.com"
+            echo "- Dashboard: https://dashboard.render.com/web/$RENDER_PROD_SERVICE_ID"
+          } >> "$GITHUB_STEP_SUMMARY"
