@@ -935,3 +935,32 @@ PM 223,647 · engineer 2,618,180 · QA 1,179,926 · reviewer 466,660 → **≈ 4
 ### Next
 
 M4 remains open on #45 (integration suite in Compose, single-command tests) and #46 (Playwright E2E happy path) — both independent, both rubric-relevant for Testing depth. Then M5 (Grafana dashboards, ≥1 alert on the monitor's red hook, on-call drill tier 1) and M6 (docs/demo) toward the Oct-26 submission. Post-merge housekeeping for the orchestrator: none pending — all repo variables set.
+
+## 2026-10-22 (afternoon) — Cycles #27–#28: the M4 queue closed — integration story and E2E land
+
+### What and why
+
+The owner called the M4 queue for same-day closure. Two sequential cycles:
+
+- **Cycle #27 (issue #45, PR #55)**: the single-command test story — root `npm test` (concurrently, two real lanes, kill-others-on-fail) and `npm run test:integration` (~90 s: compose `clown-circus-it` on loopback 18000/15432 via a `!override` port file, the #41 integration tests LIVE, the FULL backend suite against real Postgres via `IT_DATABASE_URL`, trapped `down -v`); CI stays 6 jobs (recorded decision: the CD is the merge gate; rubric #6 reads single-command-local).
+- **Cycle #28 (issue #46, PR #56)**: Playwright E2E happy path — hooks-driven (reset/advanceTicks/inject, dev server on :4300 with the `--host 127.0.0.1` vite-5 macOS pin), compose real backend (CORS overlay), forced game-over via the real `inject lives:0`+tick transition, submit→leaderboard asserted with per-run unique names, prod-gating grep (`test:prod-gating` → 0 matches in dist), retries 1/workers 1 as the plan §8 flake budget. CI stays local-only (E2E is "extra" per the final rubric).
+
+### The rework (cycle #27): the two readers found complementary real defects
+
+QA FAILed the docs counts (the 6 unit skips are 5 integration + 1 replayTrace; the file has 5 tests, not 6) while the reviewer REQUEST_CHANGES'd a **[major] the QA battery had not covered**: the conftest `IT_DATABASE_URL` branch had NO host guard — a forgotten exported variable pointing at any remote Postgres (e.g. Neon dev) would have been `drop_all`-ed per test at the next pytest run. Fix (`b9d13b2`): loopback-only guard (localhost/127.0.0.1/::1, `IT_ALLOW_REMOTE=1` escape) failing at conftest LOAD before any engine exists — verified live with a Neon host aborting; plus the IT script exporting `DATABASE_URL` (the app lifespan now targets the compose Postgres, not a stray SQLite file), artifact gitignored, docs counts and paths corrected. Final: [REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/55#issuecomment-6342962440), [QA PASS (rework)](https://github.com/lucapug/clown-circus-reloaded/pull/55#issuecomment-6343111481). Merged by the owner.
+
+Cycle #28 needed **zero rework**: [QA PASS](https://github.com/lucapug/clown-circus-reloaded/pull/56#issuecomment-6344504031) — 2-run stability (13 s/11 s wall, test body ~1 s), the RED proof that the test dies without the hooks (independent API confirmation of the leaderboard entry), prod-gating grep verified complete against the real `debugHooks` export surface; [REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/56#issuecomment-6344410781) — zero findings above note, TOCTOU-free by construction. Merge pending the owner; its merge closes **M4 4/4**.
+
+### Measured ledger (cycles #27–#28)
+
+#27: PM 270,959 · engineer 1,232,466 · QA 2,510,252 · reviewer 659,459 · mini-agent 1,049,794 (trial #10: the four-fix rework) ≈ **5.72M**. #28: PM 337,251 · engineer 3,055,566 · QA 1,233,740 · reviewer 408,840 ≈ **5.04M**. Two-day loop total (cycles #19–#28): **≈ 52.3M** measurable.
+
+### Lessons
+
+- **The guard-shaped defect is its own class**: QA's behavioral battery (all green, mutations biting) could not see that the new test capability was a loaded gun pointed at whatever Postgres the shell named. Only the normative reader asking "what happens on the unhappy path?" catches a missing guard. Both defects shipped in the same PR; both caught before merge.
+- The E2E RED proof (rename `__game` → test dies) is the hooks-equivalent of the mutant test: it proves the test measures the thing it claims to measure.
+- Stray untracked Playwright artifacts appeared on the shared tree from local runs — cleaned; the .gitignore additions in #56 prevent recurrence.
+
+### Next
+
+**M4 4/4 on the owner's merge of PR #56.** Remaining toward Oct-26: M5 (Grafana Cloud dashboards for the key journey, ≥1 actionable alert wired to the health-monitor red, on-call drill tier 1 — telemetry and the alert hook are already armed), M6 (README/docs polish, demo artifacts), M7 (repo public + submission). #45/#46 were the last groomed build issues; M5/M6 grooming next session.
