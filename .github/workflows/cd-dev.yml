@@ -37,9 +37,14 @@ env:
   IMAGE_NAME: ghcr.io/lucapug/clown-circus-reloaded
   RENDER_API_BASE: https://api.render.com/v1
   DEV_HEALTH_URL: https://clown-circus-reloaded.onrender.com/health
+  # The commit CD deploys is the CI-green head of the triggering run — NOT
+  # GITHUB_SHA, which under `workflow_run` is the default-branch HEAD and can
+  # drift past the tested commit if more pushes land while the deploy runs.
+  DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
 
 jobs:
-  # Tag construction: deterministic from UTC clock + full commit sha.
+  # Tag construction: deterministic from UTC clock + the CI-green commit
+  # (workflow-level DEPLOY_SHA — see env block; never GITHUB_SHA here).
   # Carries the workflow-level gate so a failed CI run skips everything.
   meta:
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
@@ -51,7 +56,7 @@ jobs:
     steps:
       - id: tags
         run: |
-          SHORTSHA="${GITHUB_SHA::7}"
+          SHORTSHA="${DEPLOY_SHA::7}"
           IMMUTABLE="$(date -u +%Y%m%d-%H%M%S)-${SHORTSHA}"   # e.g. 20261022-141503-1a2b3c4
           echo "shortsha=$SHORTSHA"      >> "$GITHUB_OUTPUT"
           echo "immutable=$IMMUTABLE"    >> "$GITHUB_OUTPUT"

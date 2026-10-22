@@ -137,6 +137,12 @@ Redeploy the previous immutable tag:
 Rolling back `service.version` is NOT part of the rollback drill: a stale
 short sha may appear in metrics after a rollback — accepted for dev.
 
+**GHCR tags are MUTABLE.** The `YYYYMMDD-HHMMSS-<shortsha>` tag is
+unique-by-convention only: a re-run of the same commit started in the same
+UTC second rebuilds and re-points the same tag. The future prod promotion
+(#48) must therefore reference the image **digest** (`sha256:…`, printed in
+every `push-ghcr`/`deploy-dev` job summary), never the tag alone.
+
 ### Render value-field lessons (from the 2026-10-21 Grafana work)
 
 - **No quotes in Render value fields** — values are stored literally; the

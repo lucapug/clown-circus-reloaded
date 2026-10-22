@@ -140,8 +140,10 @@ echo ""
 # meta-equivalent: tag construction (identical lines to the workflow)
 # ---------------------------------------------------------------------------
 construct_tags() {
-  GITHUB_SHA="${GITHUB_SHA:-0123456789abcdef0123456789abcdef01234567}"
-  SHORTSHA="${GITHUB_SHA::7}"
+  # Workflow env: DEPLOY_SHA = workflow_run.head_sha || github.sha — the
+  # CI-green commit, NOT GITHUB_SHA. Locally any 40-hex placeholder works.
+  DEPLOY_SHA="${DEPLOY_SHA:-0123456789abcdef0123456789abcdef01234567}"
+  SHORTSHA="${DEPLOY_SHA::7}"
   IMMUTABLE="$(date -u +%Y%m%d-%H%M%S)-${SHORTSHA}"   # e.g. 20261022-141503-1a2b3c4
 }
 
