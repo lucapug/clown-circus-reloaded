@@ -63,10 +63,96 @@ The service URL is `https://clown-circus-reloaded.onrender.com`.
   wakes it; expect roughly a minute of cold start. The 750 free
   instance-hours/month cover a single always-on free service.
 - Cold start latency is accepted as cosmetic (plan §2, decision D6).
-- **M4 future work (context, not scope):** M4 adds GHCR immutable image tags,
-  API-triggered deploys, and a prod service. When that CD lands, the CI
-  concurrency group must be **split** so deploy jobs don't serialize with
-  test jobs (reviewer finding from cycles #4/#2).
+- **CD (live workflow, issue #47):** GHCR immutable image tags and
+  API-triggered deploys to this dev service are automated — see "Continuous
+  deployment (#47)" below. The earlier note (cycles #4/#2 reviewer finding)
+  that the CI concurrency group "must be **split**" is **superseded**: the CD
+  workflow runs in its own disjoint concurrency group (`cd-dev-main`,
+  `cancel-in-progress: false`), so a new CI run can never cancel an in-flight
+  deploy and `.github/workflows/ci.yml` is unchanged. Prod promotion and
+  monitoring remain #48 (M5).
+
+## Continuous deployment (#47)
+
+Merging to `main` deploys automatically. One workflow does it:
+`.github/workflows/cd-dev.yml` (name `CD dev`). The flow in words:
+
+```
+push main → CI green → workflow_run (CI completed, branches [main])
+  → meta job builds tags (UTC clock + short sha)
+  → push-ghcr: build ONCE, push ghcr.io/lucapug/clown-circus-reloaded
+      :<YYYYMMDD-HHMMSS-<shortsha>>  (immutable)  +  :main  (moving)
+  → deploy-dev: PATCH Render service (image + OTEL service.version=<shortsha>)
+      → POST /deploys → poll to "live" (30 x 20 s cap) → poll GET /health
+        until the EXACT body {"status":"ok"} (30 x 20 s cap)
+  → green; any validation failure goes red
+```
+
+The tag format is deterministic: `YYYYMMDD-HHMMSS-<shortsha>` from the UTC
+clock and the `main` commit sha (example: `20261022-141503-1a2b3c4`). The
+image digest is printed in both jobs' summaries. The CD workflow uses the
+disjoint concurrency group `cd-dev-main` with `cancel-in-progress: false`, so
+CI runs can never cancel a running deploy and back-to-back merges queue
+(the surplus beyond 1 queued run is dropped — the next push re-triggers).
+`ci.yml` is untouched.
+
+### Owner one-time setup (before the first configured deploy)
+
+1. **Render API key**: Render **Account Settings → API Keys → Create API
+   Key**. Free tier has no finer scopes — the key is full-account (stated;
+   treat it accordingly). Load it as a GitHub secret:
+   `gh secret set RENDER_API_KEY` (paste the key when prompted). Never put
+   the value anywhere else.
+2. **Dev service ID**: find it in the Render dashboard URL of the dev
+   service (`srv-…`), then set it as a repo VARIABLE (not a secret — a
+   service ID is not credential-like):
+   `gh variable set RENDER_DEV_SERVICE_ID --body "srv-…"`.
+3. **Flip the dev service from repo-build to image deploys — ONLY AFTER the
+   first package exists** (one green `push-ghcr` run on `main`; trigger one
+   with `gh workflow run cd-dev.yml --ref main`). In the Render dashboard:
+   dev service **Edit → Image source**, set the image URL
+   `ghcr.io/lucapug/clown-circus-reloaded:main`, remove the repo/Dockerfile
+   source. No registry credentials are needed in Render once the package is
+   public (next step). Until this flip, deploys PATCH+POST against the old
+   repo-build service and Render deploys from the repo again — which is why
+   the flip must follow the first push-ghcr run.
+4. **GHCR package visibility → Public**: GitHub → Packages →
+   `clown-circus-reloaded` → Package settings → Change visibility → Public
+   (recommendation per the issue and the 2026-10-21 owner notes; a private
+   package would additionally need a Render registry credential).
+
+### Rollback (one action, two equivalent forms)
+
+Redeploy the previous immutable tag:
+
+- **Click path**: Render dashboard → dev service → **Deploys** → select the
+  previous immutable deploy → **Redeploy** (with the image-tag dropdown when
+  the service is image-backed).
+- **API path**: re-PATCH `image.imagePath` to the previous
+  `YYYYMMDD-HHMMSS-<shortsha>` tag, then `POST
+  /v1/services/<service-id>/deploys` — exactly the workflow's own two calls.
+  Find previous tags via `gh api /users/lucapug/packages/container/clown-circus-reloaded/versions`
+  or the `push-ghcr` job summaries.
+
+Rolling back `service.version` is NOT part of the rollback drill: a stale
+short sha may appear in metrics after a rollback — accepted for dev.
+
+### Render value-field lessons (from the 2026-10-21 Grafana work)
+
+- **No quotes in Render value fields** — values are stored literally; the
+  Grafana snippet form `export VAR="…"` is shell syntax and the quotes become
+  data (the `Authorization` header incident class). The workflow constructs
+  `OTEL_RESOURCE_ATTRIBUTES` without quotes for this reason.
+- **URL-encode Python snippets** when adapting the `OTEL_EXPORTER_OTLP_HEADERS`
+  incident class — percent-encoding in the snippet is data the SDK parses.
+
+### Local rehearsal (no Render credentials needed)
+
+`bash ops/cd-dry-run.sh` replays the deploy path against an inline mock
+Render API: it checks the immutable-tag format, the exact
+`service.version` string in the PATCH body (matching the tag suffix), the
+poll-to-`live` loop, and proves the health assert is exact-byte (it must
+FAIL on a trailing-space body and on HTTP 503).
 
 ## Rubric note
 
