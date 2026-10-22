@@ -69,8 +69,8 @@ The service URL is `https://clown-circus-reloaded.onrender.com`.
   that the CI concurrency group "must be **split**" is **superseded**: the CD
   workflow runs in its own disjoint concurrency group (`cd-dev-main`,
   `cancel-in-progress: false`), so a new CI run can never cancel an in-flight
-  deploy and `.github/workflows/ci.yml` is unchanged. Prod promotion and
-  monitoring remain #48 (M5).
+  deploy and `.github/workflows/ci.yml` is unchanged. Prod promotion and the
+  scheduled health monitor are covered in "Prod promotion (#48)" below.
 
 ## Continuous deployment (#47)
 
@@ -201,6 +201,13 @@ every `push-ghcr`/`deploy-dev` job summary), never the tag alone.
   `OTEL_RESOURCE_ATTRIBUTES` without quotes for this reason.
 - **URL-encode Python snippets** when adapting the `OTEL_EXPORTER_OTLP_HEADERS`
   incident class — percent-encoding in the snippet is data the SDK parses.
+- **Token rotation** (Grafana ↔ Render, functional procedure — token values
+  never appear in repo or logs, placeholders only): issue a NEW token in
+  Grafana, set it into the Render `OTEL_EXPORTER_OTLP_HEADERS` value
+  (`authorization=<new-token>`, no quotes — see the first bullet) via the
+  env-vars endpoint or dashboard, verify telemetry still arrives in
+  Grafana, then revoke the OLD token in Grafana. The rotation window is
+  the overlap: two valid tokens, one switch, one revoke.
 
 ### Local rehearsal (no Render credentials needed)
 
@@ -217,7 +224,109 @@ while updating ONLY `OTEL_RESOURCE_ATTRIBUTES` (and ADDS it when absent);
 and a mocked HTTP 400 makes the api helper exit non-zero WITH the response
 body printed. Each of the three #52 checks is mutation-proven — breaking
 the PATCH shape, corrupting an unrelated value, or swallowing the error
-body flips exactly that check red.
+body flips exactly that check red. For issue #48 the same script also
+rehearses the promotion and monitor paths against the mock (a mocked
+ghcr.io anonymous token/manifest exchange included): the prod PATCH body
+shape and env-vars preservation, the tag-format / GHCR-404 /
+expected_digest-mismatch refusals (each proven to fail BEFORE any Render
+call via a request log), the 45-attempt promotion poll budget, the
+monitor's variable guard and exact-body assert, and structural trigger
+safety (no auto trigger on cd-promote, `permissions: {}` on
+health-monitor) — the refusal and exact-body checks are again
+mutation-proven in the script itself.
+
+## Prod promotion (#48)
+
+The prod service `clown-circus-reloaded-prod` (Render environment
+"Production", region Frankfurt, free plan, health path `/health`) runs the
+SAME immutable GHCR image already validated on dev. It is deployed ONLY by
+an explicit manual dispatch of `.github/workflows/cd-promote.yml` —
+**nothing auto-deploys prod, ever**. `auto-deploy` is OFF on the prod
+service (owner-verified setting): a PATCH/PUT must never trigger an
+unsupervised deploy.
+
+### Promote = one dispatch
+
+```sh
+gh workflow run cd-promote.yml --ref main \
+  -f tag=<YYYYMMDD-HHMMSS-<shortsha>> \
+  -f expected_digest=<sha256:…>
+```
+
+Both values come from the dev `CD dev` workflow run summaries (jobs
+`GHCR push` / `CD dev deploy` — the `Image:` and `Digest:` lines).
+`expected_digest` is optional in the workflow but is the STANDARD
+practice: **promotion identity = digest** — GHCR tags are MUTABLE
+("GHCR tags are MUTABLE" above). The workflow resolves the digest of the
+requested tag live from GHCR anonymously BEFORE touching Render, so:
+
+- a tag that is not present in GHCR fails fast
+  (`not present in GHCR — refusing to promote`);
+- a provided `expected_digest` that does not match the resolved digest
+  fails the run before any Render call;
+- the run summary prints tag + digest + the `expected_digest` verdict —
+  the digest-equality dev↔prod evidence.
+
+The deploy sequence mirrors CD dev (owners fetch → service PATCH →
+env-vars GET/PUT updating only `OTEL_RESOURCE_ATTRIBUTES` to
+`deployment.environment.name=prod,service.version=<shortsha>` → POST
+deploy → poll to `live` → prod `/health` exact-body `{"status":"ok"}`).
+
+### First promotion (repo-build → image switch)
+
+Prod was created in **repo-build** mode because the Render "Existing
+image" wizard path requires explicit registry-credential configuration
+for ghcr.io (quirk — the API path has no such requirement for a public
+package, so promotion via the workflow is the supported switch). The
+FIRST promotion PATCHes prod repo→image exactly like the dev switch did
+(dev: run 39762394105), and Render may queue multiple serialized deploys
+for that switch — hence the 45 × 20 s poll cap (15 min) in the promotion
+workflow vs the 10-min dev cap. Steady-state promotions settle in ~3 min.
+
+### Rollback = re-promote the previous tag
+
+Same dispatch with the previous tag:
+
+```sh
+gh workflow run cd-promote.yml --ref main \
+  -f tag=<previous YYYYMMDD-HHMMSS-<shortsha>> \
+  -f expected_digest=<previous sha256:…>
+```
+
+Previous tags are listed in past dev `CD dev` run summaries and in
+`gh api /users/lucapug/packages/container/clown-circus-reloaded/versions`.
+Rolling back `service.version` is NOT part of the drill (same acceptance
+as the dev rollback above).
+
+### Environment layout
+
+- Render environment **"Development"**: dev service
+  `clown-circus-reloaded` — `https://clown-circus-reloaded.onrender.com`.
+- Render environment **"Production"**: prod service
+  `clown-circus-reloaded-prod` —
+  `https://clown-circus-reloaded-prod.onrender.com`, with its OWN Neon
+  database (separate branch/database in the same Neon project — never the
+  dev DB; the connection string lives only in the prod service's
+  environment as a secret, `DATABASE_URL`).
+- Both services are linked to the env group `clown-circus-reloaded-otel`
+  (OTel endpoint/headers; functionally documented, placeholders only).
+- Repo variables `DEV_HEALTH_URL` / `PROD_HEALTH_URL` are the single
+  source of the health-check URLs (the CD/monitor workflows fall back to
+  the literal URLs when a variable is missing).
+
+### Scheduled health monitor
+
+`.github/workflows/health-monitor.yml` (cron `*/15 * * * *`, plus
+`workflow_dispatch` for immediate testing) pings `/health` on both
+environments with 3 × 10 s bounded retries per env and asserts the exact
+body `{"status":"ok"}`; any failure turns the job red — that red run is
+the M5 alert hook (no paging yet). The 15-min cadence doubles as the
+free-tier keep-warm. Cold-start tuning rule: if a ~1-min cold start ever
+trips the 3 × 10 s budget, widen the retry sleep to 30 s and record the
+tuning here — never silently.
+
+**First demonstrated promotion: <run link> (<date>)** — C2 evidence
+placeholder, filled post-merge.
 
 ## Rubric note
 

@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
-# cd-dry-run.sh — mock rehearsal of the cd-dev.yml deploy path (issues #47/#52).
+# cd-dry-run.sh — mock rehearsal of the cd-dev.yml deploy path (issues
+# #47/#52) and the cd-promote.yml / health-monitor.yml paths (issue #48).
 #
 # Exercises the SAME shell logic as .github/workflows/cd-dev.yml against an
 # inline mock server (python3 stdlib http.server) emulating the Render API
 # (GET /owners, PATCH service, GET/PUT env-vars, POST deploy, GET deploy ->
-# live) and the dev /health endpoint. No network, no credentials: the "API
-# key" is the literal dummy `dry-run` and is never validated.
+# live) and the dev /health endpoint. For #48 the same mock also emulates a
+# ghcr.io anonymous exchange (GET /token, GET /v2/.../manifests/<tag> with a
+# Docker-Content-Digest header) so the promotion path resolves digests with
+# no network. No network, no credentials: the "API key" is the literal
+# dummy `dry-run` and is never validated.
 #
 # Checks (issue #47 DoD B; #50; #52):
 #   (i)    the constructed immutable tag matches
@@ -36,6 +40,30 @@
 #          failed ATTEMPTS (helper output shown, counter reset on success)
 #          and gives up only on 3 CONSECUTIVE failures, with the last body
 #          (scenarios D/E: 2x502 -> live; 3x502 -> give-up).
+#
+# Issue #48 additions (each new check mutation-proven per the file's
+# convention):
+#   (#48a) the promote tag-format gate refuses a malformed tag, and a
+#          request log kept by the mock proves NO Render call happened;
+#   (#48b) the anonymous GHCR digest resolution (token -> manifest ->
+#          Docker-Content-Digest, with the full Accept set) works against
+#          the mock, and a mocked 404 refuses with "not present in GHCR"
+#          BEFORE any Render call;
+#   (#48c) an expected_digest MISMATCH refuses BEFORE any Render call
+#          (request-log proven) — the #49 digest rule made operational;
+#   (#48d) the promote flow (owners -> prod PATCH -> prod env-vars ->
+#          POST -> poll -> prod health) patches EXACTLY
+#          {image:{ownerId, imagePath}} with the promoted tag as
+#          imagePath, sets
+#          deployment.environment.name=prod,service.version=<shortsha>
+#          (shortsha = promoted tag suffix), preserves every other
+#          env var byte-for-byte, and asserts the prod health exact body;
+#   (#48e) the promotion workflow pins a 45-attempt poll (15 min cap) and
+#          the monitor workflow pins the */15 cron — structural greps of
+#          the workflow files (trigger safety, permissions: {}, no `uses:`)
+#   (#48f) the monitor check (guard on unset repo variables, then 3x10s
+#          retries with the exact-body assert) logs "health ok: <env>
+#          (attempt N)" and fails on a mutant body.
 #
 # Retries/timings default to the workflow's values but are tunable so the
 # rehearsal runs in seconds: POLL_ATTEMPTS/POLL_INTERVAL/HEALTH_ATTEMPTS/
@@ -114,13 +142,21 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
 
+    def _log(self):
+        # Request log: the #48 refusal checks assert that a refusal path
+        # NEVER touches Render (no /v1/ request after log truncation).
+        with (state_dir / "requests.log").open("a") as f:
+            f.write(f"{self.command} {self.path}\n")
+
     def _body(self):
         n = int(self.headers.get("Content-Length") or 0)
         return self.rfile.read(n).decode() if n else ""
 
-    def _send(self, code, body):
+    def _send(self, code, body, extra_headers=None):
         data = body.encode()
         self.send_response(code)
+        for k, v in (extra_headers or {}).items():
+            self.send_header(k, v)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
@@ -131,6 +167,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         return f.read_text().strip() if f.exists() else ""
 
     def do_PATCH(self):
+        self._log()
         if self._mode("patch_mode") == "400":
             self._send(400, json.dumps({
                 "message": "PATCH must fail with this body visible",
@@ -140,16 +177,37 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self._send(200, json.dumps({"id": self._mode("service_id") or "srv-mock"}))
 
     def do_PUT(self):
+        self._log()
         body = self._body()   # read ONCE — a second read would block on the socket
         (state_dir / "put_body.json").write_text(body)
         self._send(200, body)
 
     def do_POST(self):
+        self._log()
         (state_dir / "post_body.json").write_text(self._body())
         self._send(200, json.dumps({"id": "dep-mock-1"}))
 
     def do_GET(self):
+        self._log()
         u = urlparse(self.path)
+        # --- ghcr.io mock (issue #48): anonymous token + manifest with the
+        # Docker-Content-Digest header the promotion path resolves.
+        if u.path == "/token":
+            self._send(200, json.dumps({"token": "dry-run-ghcr-token"}))
+            return
+        if u.path.startswith("/v2/") and "/manifests/" in u.path:
+            tag = u.path.rsplit("/", 1)[1]
+            if self._mode("ghcr_mode") == "404":
+                self._send(404, json.dumps(
+                    {"errors": [{"code": "MANIFEST_UNKNOWN", "tag": tag}]}))
+                return
+            digest = self._mode("ghcr_digest") or "sha256:" + ("ab" * 32)
+            self._send(200, json.dumps({
+                "schemaVersion": 2,
+                "mediaType": "application/vnd.oci.image.index.v1+json",
+                "manifests": []}),
+                extra_headers={"Docker-Content-Digest": digest})
+            return
         path = u.path[3:] if u.path.startswith("/v1") else u.path  # base carries /v1
         if path == "/health":
             mode = self._mode("health_mode") or "ok"
@@ -221,8 +279,17 @@ if [[ "$READY" != 1 ]]; then echo "FAIL: mock server did not start"; exit 1; fi
 PORT="$(cat "$STATE/port")"
 RENDER_API_BASE="http://127.0.0.1:$PORT/v1"
 DEV_HEALTH_URL="http://127.0.0.1:$PORT/health"
+GHCR_BASE="http://127.0.0.1:$PORT"          # ghcr.io mock (token + manifests)
+IMAGE_REPO="lucapug/clown-circus-reloaded"  # registry path without ghcr.io/
+RENDER_PROD_SERVICE_ID="srv-mock-prod"
+PROD_HEALTH_URL="http://127.0.0.1:$PORT/health"
 
-echo "== cd-dry-run: mock Render at 127.0.0.1:$PORT =="
+# Repo-relative paths of the workflows under structural check (#48e).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROMOTE_WF="$(cd "$SCRIPT_DIR/.." && pwd)/.github/workflows/cd-promote.yml"
+MONITOR_WF="$(cd "$SCRIPT_DIR/.." && pwd)/.github/workflows/health-monitor.yml"
+
+echo "== cd-dry-run: mock Render + mock ghcr.io at 127.0.0.1:$PORT =="
 echo ""
 
 # ---------------------------------------------------------------------------
@@ -301,17 +368,23 @@ fetch_owner_id() {
 }
 
 patch_service() {
+  # Optional args (issue #48): patch_service [service_id] [tag] — defaults
+  # keep the #47/#52 dev-flow call sites unchanged.
+  local service_id="${1:-$RENDER_DEV_SERVICE_ID}" tag="${2:-$IMMUTABLE}"
   BODY="$(jq -n --arg owner "$OWNER_ID" \
-    --arg img "${IMAGE_NAME}:${IMMUTABLE}" \
+    --arg img "${IMAGE_NAME}:${tag}" \
     '{image: {ownerId: $owner, imagePath: $img}}')"
-  api PATCH "/services/$RENDER_DEV_SERVICE_ID" "$BODY" > /dev/null
+  api PATCH "/services/$service_id" "$BODY" > /dev/null
 }
 
 update_env_vars() {
+  # Optional args (issue #48): update_env_vars [service_id] [otel_value].
+  local service_id="${1:-$RENDER_DEV_SERVICE_ID}"
+  local new_otel="${2:-deployment.environment.name=dev,service.version=${SHORTSHA}}"
   local cursor="" page ep current
   : > "$RUNNER_TEMP/env-vars.jsonl"
   while :; do
-    ep="/services/$RENDER_DEV_SERVICE_ID/env-vars?limit=100"
+    ep="/services/$service_id/env-vars?limit=100"
     if [[ -n "$cursor" ]]; then
       ep="${ep}&cursor=$(jq -rn --arg c "$cursor" '$c|@uri')"
     fi
@@ -322,7 +395,7 @@ update_env_vars() {
   done
   current="$(jq -s '.' "$RUNNER_TEMP/env-vars.jsonl")"   # one flat [{key,value}, ...]
   echo "  fetched env var keys: $(echo "$current" | jq -r 'map(.key) | join(", ")')"
-  NEW_OTEL="deployment.environment.name=dev,service.version=${SHORTSHA}"
+  NEW_OTEL="$new_otel"
   UPDATED="$(echo "$current" | jq --arg k OTEL_RESOURCE_ATTRIBUTES --arg v "$NEW_OTEL" '
     if any(.[]; .key == $k)
     then map(if .key == $k then .value = $v else . end)
@@ -334,24 +407,28 @@ update_env_vars() {
     echo "keys in PUT body: $(echo "$UPDATED" | jq -r 'map(.key) | join(", ")')" >&2
     exit 1
   fi
-  api PUT "/services/$RENDER_DEV_SERVICE_ID/env-vars" "$UPDATED" > /dev/null
+  api PUT "/services/$service_id/env-vars" "$UPDATED" > /dev/null
   echo "  env-vars updated: OTEL_RESOURCE_ATTRIBUTES=$NEW_OTEL (all other keys preserved)"
 }
 
 post_deploy() {
-  BODY="$(jq -n --arg img "${IMAGE_NAME}:${IMMUTABLE}" '{imageUrl:$img}')"
-  RESP="$(api POST "/services/$RENDER_DEV_SERVICE_ID/deploys" "$BODY")"
+  # Optional args (issue #48): post_deploy [service_id] [tag].
+  local service_id="${1:-$RENDER_DEV_SERVICE_ID}" tag="${2:-$IMMUTABLE}"
+  BODY="$(jq -n --arg img "${IMAGE_NAME}:${tag}" '{imageUrl:$img}')"
+  RESP="$(api POST "/services/$service_id/deploys" "$BODY")"
   DEPLOY_ID="$(echo "$RESP" | jq -r '.id')"
 }
 
 poll_deploy() {
+  # Optional arg (issue #48): poll_deploy [service_id].
+  local service_id="${1:-$RENDER_DEV_SERVICE_ID}"
   local i status resp consecutive=0 api_err
   # Same failure semantics as the workflow poll step: an api() failure
   # (transport or non-2xx) fails the ATTEMPT only — helper output is kept
   # and shown, a success resets the counter, 3 CONSECUTIVE failures give up.
   api_err="$RUNNER_TEMP/poll-api.err"
   for i in $(seq 1 "$POLL_ATTEMPTS"); do
-    if resp="$(api GET "/services/$RENDER_DEV_SERVICE_ID/deploys/$DEPLOY_ID" 2>"$api_err")"; then
+    if resp="$(api GET "/services/$service_id/deploys/$DEPLOY_ID" 2>"$api_err")"; then
       consecutive=0
       status="$(echo "$resp" | jq -r '.status')"
       echo "  poll $i/$POLL_ATTEMPTS: ${status:-<no status>}"
@@ -376,9 +453,11 @@ poll_deploy() {
 }
 
 health_assert() {
+  # Optional arg (issue #48): health_assert [url].
+  local url="${1:-$DEV_HEALTH_URL}"
   local i resp status body last=""
   for i in $(seq 1 "$HEALTH_ATTEMPTS"); do
-    resp="$(curl -sS -w '\nHTTP_STATUS:%{http_code}' --max-time 10 "$DEV_HEALTH_URL" 2>/dev/null || true)"
+    resp="$(curl -sS -w '\nHTTP_STATUS:%{http_code}' --max-time 10 "$url" 2>/dev/null || true)"
     status="${resp##*$'\n'}"; status="${status#HTTP_STATUS:}"
     body="${resp%$'\n'*}"
     if [[ "$status" == "200" && "$body" == '{"status":"ok"}' ]]; then
@@ -388,6 +467,104 @@ health_assert() {
     sleep "$HEALTH_INTERVAL"
   done
   echo "  health validation failed — last observed: $last"; return 1
+}
+
+# ---------------------------------------------------------------------------
+# Issue #48: promotion-path equivalents (same logic as cd-promote.yml)
+# ---------------------------------------------------------------------------
+promote_tag_gate() {
+  # Step-1 equivalent: fail fast on a malformed tag, BEFORE any network call.
+  local tag="$1"
+  if [[ ! "$tag" =~ ^[0-9]{8}-[0-9]{6}-[0-9a-f]{7}$ ]]; then
+    echo "::error::tag '$tag' does not match YYYYMMDD-HHMMSS-<shortsha> — refusing to promote" >&2
+    return 1
+  fi
+}
+
+resolve_digest() {
+  # Step-2 equivalent: anonymous token -> manifest (full Accept set) ->
+  # Docker-Content-Digest header. Sets RESOLVED_DIGEST on success.
+  local tag="$1" token resp status digest accept
+  token="$(curl -sS "${GHCR_BASE}/token?scope=repository:${IMAGE_REPO}:pull" | jq -r '.token')"
+  if [[ -z "$token" || "$token" == "null" ]]; then
+    echo "::error::could not obtain anonymous GHCR pull token" >&2; return 1
+  fi
+  # The Accept set MUST include the OCI-index and Docker manifest-list
+  # types so Docker-Content-Digest equals the TOP-LEVEL index digest.
+  accept='application/vnd.docker.distribution.manifest.v2+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json'
+  resp="$(curl -sS -D "$RUNNER_TEMP/manifest-headers.txt" -o "$RUNNER_TEMP/manifest-body.json" \
+    -w '\nHTTP_STATUS:%{http_code}' \
+    -H "Authorization: Bearer $token" -H "Accept: $accept" \
+    "${GHCR_BASE}/v2/${IMAGE_REPO}/manifests/${tag}")"
+  status="${resp##*$'\n'}"; status="${status#HTTP_STATUS:}"
+  if [[ "$status" == "404" ]]; then
+    echo "::error::tag ${tag} not present in GHCR — refusing to promote" >&2
+    return 1
+  fi
+  if [[ ! "$status" =~ ^2[0-9][0-9]$ ]]; then
+    echo "::error::GHCR manifest request for ${tag} failed (HTTP ${status})" >&2
+    cat "$RUNNER_TEMP/manifest-body.json" >&2
+    return 1
+  fi
+  digest="$(grep -i '^docker-content-digest:' "$RUNNER_TEMP/manifest-headers.txt" | tail -1 | tr -d '\r' | awk '{print $2}')"
+  if [[ -z "$digest" ]]; then
+    echo "::error::GHCR response carried no Docker-Content-Digest header — cannot establish promotion identity" >&2
+    return 1
+  fi
+  RESOLVED_DIGEST="$digest"
+}
+
+promote_expected_digest_gate() {
+  # Step-3 equivalent: normalize (trim + strip sha256: prefix) and compare;
+  # a mismatch refuses BEFORE any Render call.
+  local expected resolved
+  expected="$(echo "${1:-}" | tr -d '[:space:]')"
+  expected="${expected#sha256:}"
+  resolved="${RESOLVED_DIGEST#sha256:}"
+  if [[ "$expected" != "$resolved" ]]; then
+    echo "::error::expected_digest mismatch — refusing to promote BEFORE touching Render" >&2
+    echo "  expected: sha256:${expected}" >&2
+    echo "  resolved: ${RESOLVED_DIGEST}" >&2
+    return 1
+  fi
+}
+
+no_render_calls_since() {
+  # True when the mock request log holds no Render (/v1/) call — the
+  # refusal paths must never touch Render.
+  ! grep -qE '^(GET|PATCH|PUT|POST) /v1/' "$STATE/requests.log"
+}
+
+# ---------------------------------------------------------------------------
+# Issue #48: monitor equivalents (same logic as health-monitor.yml)
+# ---------------------------------------------------------------------------
+MONITOR_INTERVAL="${MONITOR_INTERVAL:-10}"
+
+monitor_guard() {
+  # Guard equivalent: an unset repo variable is a visible misconfiguration.
+  local failed=0
+  if [[ -z "${1:-}" ]]; then echo "::error::repo variable DEV_HEALTH_URL is not set" >&2; failed=1; fi
+  if [[ -z "${2:-}" ]]; then echo "::error::repo variable PROD_HEALTH_URL is not set" >&2; failed=1; fi
+  return "$failed"
+}
+
+monitor_check() {
+  # check <name> <url>: 3 attempts, sleep 10 between; success = HTTP 200
+  # AND the EXACT body {"status":"ok"} (no jq).
+  local name="$1" url="$2" i resp status body last=""
+  for i in $(seq 1 3); do
+    resp="$(curl -sS -w '\nHTTP_STATUS:%{http_code}' --max-time 10 "$url" 2>/dev/null || true)"
+    status="${resp##*$'\n'}"; status="${status#HTTP_STATUS:}"
+    body="${resp%$'\n'*}"
+    if [[ "$status" == "200" && "$body" == '{"status":"ok"}' ]]; then
+      echo "health ok: ${name} (attempt ${i})"
+      return 0
+    fi
+    last="HTTP ${status:-<transport failure>} body: ${body}"
+    sleep "$MONITOR_INTERVAL"
+  done
+  echo "::error::health check failed: ${name} (${url}) — last observed: ${last}"
+  return 1
 }
 
 # ---------------------------------------------------------------------------
@@ -559,6 +736,184 @@ if ( HEALTH_ATTEMPTS=2; HEALTH_INTERVAL=1; health_assert ); then
   fail "health assert PASSED on HTTP 503 — assert is not exact"
 else
   pass "health assert correctly FAILED on HTTP 503"
+fi
+rm -f "$STATE/health_mode"
+
+# ---------------------------------------------------------------------------
+# Issue #48: promotion + monitor rehearsal
+# ---------------------------------------------------------------------------
+echo ""
+echo "-- scenario H: structural — promote/monitor workflow safety (#48e)"
+if [[ ! -f "$PROMOTE_WF" || ! -f "$MONITOR_WF" ]]; then
+  fail "#48e workflow file missing ($PROMOTE_WF / $MONITOR_WF)"
+else
+  if grep -nqE '^\s+(push|workflow_run|schedule):' "$PROMOTE_WF"; then
+    fail "#48e cd-promote.yml has an auto trigger (push/workflow_run/schedule) — nothing may auto-deploy prod"
+  else
+    pass "#48e cd-promote.yml has NO auto trigger (workflow_dispatch ONLY — nothing auto-deploys prod)"
+  fi
+  if grep -nq 'workflow_dispatch:' "$PROMOTE_WF"; then
+    pass "#48e cd-promote.yml carries the workflow_dispatch trigger"
+  else
+    fail "#48e cd-promote.yml lost workflow_dispatch"
+  fi
+  if grep -nq 'group: cd-promote-prod' "$PROMOTE_WF" \
+    && grep -nq 'cancel-in-progress: false' "$PROMOTE_WF"; then
+    pass "#48e cd-promote.yml queues under cd-promote-prod with cancel-in-progress: false"
+  else
+    fail "#48e cd-promote.yml concurrency group/queueing missing"
+  fi
+  if grep -nq 'seq 1 45' "$PROMOTE_WF" && grep -nq '15 min cap' "$PROMOTE_WF"; then
+    pass "#48e cd-promote.yml pins the 45-attempt poll (45 x 20 s = 15 min cap for the first repo->image switch)"
+  else
+    fail "#48e cd-promote.yml poll is not 45 attempts x 20 s (15 min cap)"
+  fi
+  if grep -nq 'application/vnd.oci.image.index.v1+json' "$PROMOTE_WF" \
+    && grep -nq 'application/vnd.docker.distribution.manifest.list.v2+json' "$PROMOTE_WF"; then
+    pass "#48e cd-promote.yml Accept set includes OCI-index + Docker manifest-list (top-level index digest resolved)"
+  else
+    fail "#48e cd-promote.yml Accept set is too narrow — digests would spuriously mismatch"
+  fi
+  if grep -nq "cron: '\*/15 \* \* \* \*'" "$MONITOR_WF" && grep -nq 'workflow_dispatch:' "$MONITOR_WF"; then
+    pass "#48e health-monitor.yml triggers are schedule */15 + workflow_dispatch only"
+  else
+    fail "#48e health-monitor.yml triggers wrong (need cron */15 + workflow_dispatch)"
+  fi
+  if grep -nq 'permissions: {}' "$MONITOR_WF"; then
+    pass "#48e health-monitor.yml has permissions: {} (read-none)"
+  else
+    fail "#48e health-monitor.yml permissions is not {}"
+  fi
+  if grep -nqE '^\s*(uses|secrets\.)' "$PROMOTE_WF" || grep -nqE '^\s*(uses|secrets\.)' "$MONITOR_WF"; then
+    fail "#48e a new workflow uses a third-party action or a secret (zero uses:, RENDER_API_KEY only — grep is line-anchored)"
+  else
+    pass "#48e no uses:/secrets lines at step level in either new workflow (pure curl+jq; RENDER_API_KEY is indented under env:)"
+  fi
+fi
+
+echo ""
+echo "-- scenario I: promote happy path — resolve -> gate -> Render sequence -> prod health (#48d)"
+PROMOTE_TAG="20261022-102048-84d7ba4"   # the brief's example tag
+PROMOTE_SHORTSHA="${PROMOTE_TAG##*-}"
+if resolve_digest "$PROMOTE_TAG" \
+  && promote_expected_digest_gate "  ${RESOLVED_DIGEST}" ; then   # leading spaces prove normalization
+  pass "#48d GHCR anonymous resolution returned ${RESOLVED_DIGEST}; expected_digest gate accepted it (normalized, sha256: prefix tolerated)"
+else
+  fail "#48d GHCR anonymous resolution or expected_digest gate failed on the happy path"
+fi
+: > "$STATE/requests.log"   # count only promote-flow Render calls from here
+if fetch_owner_id \
+  && patch_service "$RENDER_PROD_SERVICE_ID" "$PROMOTE_TAG" \
+  && update_env_vars "$RENDER_PROD_SERVICE_ID" "deployment.environment.name=prod,service.version=${PROMOTE_SHORTSHA}" \
+  && post_deploy "$RENDER_PROD_SERVICE_ID" "$PROMOTE_TAG" \
+  && ( POLL_ATTEMPTS=10; POLL_INTERVAL=1; poll_deploy "$RENDER_PROD_SERVICE_ID" ) \
+  && ( HEALTH_ATTEMPTS=2; HEALTH_INTERVAL=1; health_assert "$PROD_HEALTH_URL" ); then
+  if jq -e --arg owner "$OWNER_ID" --arg img "${IMAGE_NAME}:${PROMOTE_TAG}" \
+    'keys == ["image"]
+     and (.image | keys | sort) == ["imagePath", "ownerId"]
+     and .image.ownerId == $owner and .image.imagePath == $img' \
+    "$STATE/patch_body.json" > /dev/null \
+    && grep -qF "deployment.environment.name=prod,service.version=${PROMOTE_SHORTSHA}" "$STATE/put_body.json" \
+    && jq -e --slurpfile src "$STATE/env-vars-source.json" --arg v "deployment.environment.name=prod,service.version=${PROMOTE_SHORTSHA}" \
+      '([.[].key] | sort) == ([$src[0][].key] | sort)
+       and (any(.[]; .key == "OTEL_RESOURCE_ATTRIBUTES" and .value == $v))
+       and (all(.[]; .key == "OTEL_RESOURCE_ATTRIBUTES"
+            or (. as $e | any($src[0][]; .key == $e.key and .value == $e.value))))' \
+      "$STATE/put_body.json" > /dev/null; then
+    pass "#48d promote flow: prod PATCH exactly {image:{ownerId,imagePath:<promoted tag>}}, env-vars updated ONLY to prod OTEL (others byte-for-byte), deploy live, prod health exact-body ok"
+  else
+    fail "#48d promote flow bodies wrong (PATCH shape / OTEL value / preservation)"
+  fi
+else
+  fail "#48d promote happy path failed (owner/PATCH/env-vars/deploy/poll/health)"
+fi
+
+echo ""
+echo "-- scenario J: mutation — malformed tag refuses BEFORE any call (#48a)"
+: > "$STATE/requests.log"
+JOUT="$STATE/tag-gate.out"
+if ( promote_tag_gate "20261022-102048-NOPE" ) > "$JOUT" 2>&1; then
+  fail "#48a tag-format gate PASSED a malformed tag"
+else
+  if grep -q 'refusing to promote' "$JOUT" && no_render_calls_since; then
+    pass "#48a malformed tag refused ('refusing to promote') with zero Render calls"
+  else
+    fail "#48a tag gate refused without its message or after touching Render: $(cat "$JOUT")"
+  fi
+fi
+
+echo ""
+echo "-- scenario K: mutation — GHCR 404 refuses BEFORE any Render call (#48b)"
+printf '404' > "$STATE/ghcr_mode"
+: > "$STATE/requests.log"
+KOUT="$STATE/resolve404.out"
+if ( resolve_digest "$PROMOTE_TAG" ) > "$KOUT" 2>&1; then
+  fail "#48b resolve_digest PASSED on a mocked 404"
+else
+  if grep -q 'not present in GHCR' "$KOUT" && no_render_calls_since; then
+    pass "#48b GHCR-404 refused ('not present in GHCR') with zero Render calls"
+  else
+    fail "#48b GHCR-404 refusal missing its message or Render was touched: $(cat "$KOUT")"
+  fi
+fi
+rm -f "$STATE/ghcr_mode"
+
+echo ""
+echo "-- scenario L: mutation — expected_digest mismatch refuses BEFORE any Render call (#48c)"
+: > "$STATE/requests.log"
+if resolve_digest "$PROMOTE_TAG" && ( promote_expected_digest_gate "sha256:deadbeef" ); then
+  fail "#48c expected_digest gate PASSED on a wrong digest"
+else
+  if [[ "${RESOLVED_DIGEST:-}" == "sha256:$(printf 'ab%.0s' {1..32})" ]] && no_render_calls_since; then
+    pass "#48c digest mismatch refused with zero Render calls (resolved ${RESOLVED_DIGEST})"
+  else
+    fail "#48c mismatch refusal did not behave (no Render calls / wrong resolved digest)"
+  fi
+fi
+
+echo ""
+echo "-- scenario M: mutation — prod health exact-body (trailing space) on the promote path"
+printf 'trailing' > "$STATE/health_mode"
+if ( HEALTH_ATTEMPTS=2; HEALTH_INTERVAL=1; health_assert "$PROD_HEALTH_URL" ); then
+  fail "#48d prod health assert PASSED on a trailing-space body — assert is not exact"
+else
+  pass "#48d prod health assert correctly FAILED on a trailing-space body"
+fi
+rm -f "$STATE/health_mode"
+
+echo ""
+echo "-- scenario N: monitor rehearsal — guard + 3x10s checks (#48f)"
+MONITOR_INTERVAL=0
+if monitor_guard "$DEV_HEALTH_URL" "$PROD_HEALTH_URL"; then
+  pass "#48f monitor guard accepts two set URLs"
+else
+  fail "#48f monitor guard rejected set URLs"
+fi
+MOUT="$STATE/monitor.out"
+if monitor_check dev "$DEV_HEALTH_URL" > "$MOUT" 2>&1 \
+  && monitor_check prod "$PROD_HEALTH_URL" >> "$MOUT" 2>&1 \
+  && grep -q 'health ok: dev (attempt 1)' "$MOUT" \
+  && grep -q 'health ok: prod (attempt 1)' "$MOUT"; then
+  pass "#48f monitor checks logged 'health ok: dev/prod (attempt N)' on the exact-ok body"
+else
+  fail "#48f monitor checks failed on the exact-ok body: $(cat "$MOUT")"
+fi
+printf 'trailing' > "$STATE/health_mode"
+if ( monitor_check prod "$PROD_HEALTH_URL" ); then
+  fail "#48f monitor check PASSED on a trailing-space body — assert is not exact"
+else
+  pass "#48f monitor check correctly FAILED on a trailing-space body (3x10s budget)"
+fi
+rm -f "$STATE/health_mode"
+MGUARD_OUT="$STATE/monitor-guard.out"
+if monitor_guard "" "$PROD_HEALTH_URL" > "$MGUARD_OUT" 2>&1; then
+  fail "#48f monitor guard PASSED with an unset DEV_HEALTH_URL"
+else
+  if grep -q 'repo variable DEV_HEALTH_URL is not set' "$MGUARD_OUT"; then
+    pass "#48f monitor guard fails visibly on the unset variable (::error::repo variable … is not set)"
+  else
+    fail "#48f monitor guard failed without the visible misconfiguration message"
+  fi
 fi
 
 echo ""
