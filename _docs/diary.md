@@ -850,3 +850,31 @@ Layout decided and applied: Render **environment group** `clown-circus-reloaded-
 **Prima attività della sessione (ordine):** `git log --oneline -5` + `gh issue list --label M4` → ciclo #23 su **#47** (PM brief → engineer → QA + reviewer) → #48 → #45/#46 negli slot paralleli. Attribution header engineer: `engineer.md@b0d2df9`.
 
 **Lezioni vive:** checkout-main-first; smoke = il comando che gira in CI (`npm run build`, mai `tsc --noEmit` nudo); riprodurre localmente prima di iterare nel cloud; brief-vs-spec → vince la spec; browser automation = mechanism checks only.
+
+## 2026-10-22 — Cycle #23 (issue #47, PR #49): CD to dev — two reviewer rounds catch a false-provenance defect
+
+### What and why
+
+The C2-critical half of the CD work: `cd-dev.yml` (triggered only by CI success on `main` via `workflow_run`, plus `workflow_dispatch` as the verification vehicle), GHCR push of the single-container image (`YYYYMMDD-HHMMSS-<shortsha>` immutable tag + moving `main`, digest in every job summary), Render deploy (one PATCH of image + `OTEL_RESOURCE_ATTRIBUTES=…service.version=<shortsha>`, POST deploy, bounded poll to `live`, `/health` exact-body assert), the not-yet-configured degradation path (exit 0 + loud notice while the owner's `RENDER_API_KEY`/`RENDER_DEV_SERVICE_ID` are absent — main never goes red), `ops/cd-dry-run.sh` mock rehearsal with self-mutation checks, runbook (owner setup, image-mode flip, GHCR visibility, rollback), and the one permitted app change: a 3-line `HEAD /` handler with a discriminating test (silences Render's pre-check 405). The #14 relay resolved with **zero CI changes**: CI's `ci-<ref>` group contains only CI runs; CD runs in a disjoint `cd-dev-main` group with literal `cancel-in-progress: false`. The verification boundary was declared up front: structure + dry-run verified now; Render path + GHCR listing verified on first configured run (honest, in both verdicts).
+
+### The story of the rework: the reviewer's second round caught what the first fix missed
+
+QA PASSed the first implementation (structural + dry-run + mutation checks + suites + secrets hygiene). The reviewer APPROVED with 2 [minor]: GHCR tags are mutable (promotion must reference the **digest** — runbook rule added), and `GITHUB_SHA` skew under `workflow_run` (in a race window, main's tip deploys before its own CI finishes). The mini-agent rework (#7, `8e697a5`) pinned a workflow-level `DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}` feeding tag and OTEL version — **but missed that the `push-ghcr` job's bare `actions/checkout@v4` still defaulted to `github.sha`**. The reviewer's re-verification caught it and **withdrew the APPROVE** (REQUEST_CHANGES): in the race window the pipeline would have pushed a tag *labeled* with the CI-green sha containing the drifted commit's code — false provenance, worse than before. One-line fix (`ref: ${{ env.DEPLOY_SHA }}` on the checkout, `fcb23e4`) closed the provenance chain: **CI-green commit = built code = tag sha = `service.version`**. Final: [REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/49#issuecomment-6335509775) (three rounds recorded in one comment), [QA: PASS](https://github.com/lucapug/clown-circus-reloaded/pull/49#issuecomment-6335615603) with both rework sections. Merge pending the owner; the first configured run (with the owner's secret + service ID) is the declared evidence boundary for the Render leg.
+
+### Process incidents (recorded honestly)
+
+QA's in-place comment edit briefly replaced the comment body with a 24-character placeholder (`gh pr comment --edit-last -F` flag misuse), then restored the original verdict verbatim and disclosed the mishap inside the amended comment. Single-comment invariant preserved; the audit trail survived intact. Noted as a QA tooling hazard: always build comment bodies via `--body-file`, never inline flags.
+
+### Measured ledger (cycle #23)
+
+PM 248,551 · engineer 1,870,969 · QA 1,225,275 + 1,100,436 + 442,770 · reviewer 301,271 + 247,159 + 204,731 · mini-agent 385,948 (#7) + 299,986 (#8) → **≈ 6.33M**, rework 1 (two mini-agent passes: trial #7 386k, trial #8 300k — the cheapest pair yet). Owner-side inputs (secret + service ID) remain outside the cycle: the degradation path keeps main green until they land.
+
+### Lessons
+
+- **The close-out re-verification is not a formality**: the reviewer's second pass found the one line the fix missed — a checkout defaulting to a different sha than the labels it feeds. Label-value provenance must be traced END TO END (label → build input), not assumed by sharing a variable name.
+- `workflow_run`'s `GITHUB_SHA` is the branch tip, not the CI-green commit: any post-CI automation that cares WHICH commit passed must read `github.event.workflow_run.head_sha`.
+- The declared verification boundary (dry-run now, real Render leg on first configured run) kept QA honest without fake claims — the pattern for all future infrastructure cycles.
+
+### Next
+
+Owner merges PR #49 (#47 closes) → the owner's Render secret/variable + first configured run provide the Render-leg evidence; cycle #24 on **#48** (prod service + first manual promotion + health monitor — the other C2 half); #45/#46 fill the parallel slots.
