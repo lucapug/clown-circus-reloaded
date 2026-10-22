@@ -1,0 +1,71 @@
+name: Health monitor
+
+# Scheduled /health monitor for both environments (issue #48, plan M4).
+#
+# Scheduled workflows run on the DEFAULT BRANCH only — the cron below takes
+# effect after this file lands on main. The 15-min cadence doubles as the
+# free-tier keep-warm (it stops the two sleeping free services from idling
+# out). `workflow_dispatch` is deliberate: it lets the monitor be tested
+# immediately post-merge, before the first scheduled tick.
+#
+# A red run of this job IS the M5 alert hook (no paging yet).
+#
+# Cold-start tuning rule: if a ~1-min free-tier cold start ever trips the
+# 3 x 10 s retry budget, widen the retry sleep to 30 s and record the
+# tuning in ops/dev-deploy-runbook.md — never silently.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions: {}   # read-none — the job only curls two public URLs
+
+concurrency:
+  group: health-monitor
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping dev and prod /health
+        env:
+          DEV_HEALTH_URL: ${{ vars.DEV_HEALTH_URL }}
+          PROD_HEALTH_URL: ${{ vars.PROD_HEALTH_URL }}
+        run: |
+          # Guard first: an unset repo variable is a visible
+          # misconfiguration, not a cryptic curl error.
+          FAILED=0
+          if [[ -z "$DEV_HEALTH_URL" ]]; then
+            echo "::error::repo variable DEV_HEALTH_URL is not set"; FAILED=1
+          fi
+          if [[ -z "$PROD_HEALTH_URL" ]]; then
+            echo "::error::repo variable PROD_HEALTH_URL is not set"; FAILED=1
+          fi
+          if [[ "$FAILED" == 1 ]]; then exit 1; fi
+
+          # check <name> <url>: up to 3 attempts, sleep 10 between;
+          # success = HTTP 200 AND the EXACT body {"status":"ok"}
+          # (exact-byte assert, no jq). Any environment failing turns the
+          # job red — that is the alert signal.
+          check() {
+            local name="$1" url="$2" i resp status body last=""
+            for i in $(seq 1 3); do
+              resp="$(curl -sS -w '\nHTTP_STATUS:%{http_code}' --max-time 10 "$url" 2>/dev/null || true)"
+              status="${resp##*$'\n'}"; status="${status#HTTP_STATUS:}"
+              body="${resp%$'\n'*}"
+              if [[ "$status" == "200" && "$body" == '{"status":"ok"}' ]]; then
+                echo "health ok: ${name} (attempt ${i})"
+                return 0
+              fi
+              last="HTTP ${status:-<transport failure>} body: ${body}"
+              sleep 10
+            done
+            echo "::error::health check failed: ${name} (${url}) — last observed: ${last}"
+            return 1
+          }
+
+          check dev "$DEV_HEALTH_URL" || FAILED=1
+          check prod "$PROD_HEALTH_URL" || FAILED=1
+          exit "$FAILED"
