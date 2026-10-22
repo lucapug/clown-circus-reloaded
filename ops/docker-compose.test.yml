@@ -1,0 +1,17 @@
+# Test-stack override (issue #45). Used ONLY with the isolated compose project:
+#   docker compose -p clown-circus-it -f docker-compose.yml -f ops/docker-compose.test.yml ...
+# Publishes non-owner host ports bound to loopback only (qa.md port rule — the
+# owner's dev stack on 8000/5432 is never touched) and pins the CORS allow-list
+# to the vitest/jsdom origins used by
+# frontend/src/services/__tests__/integration.leaderboard.test.ts.
+# In-network URLs (`db:5432`) and service definitions are unchanged.
+services:
+  app:
+    ports: !override # replace the dev stack's "8000:8000"
+      - "127.0.0.1:18000:8000"
+    environment:
+      CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000 # vitest/jsdom origins
+
+  db:
+    ports:
+      - "127.0.0.1:15432:5432" # host side of IT_DATABASE_URL
