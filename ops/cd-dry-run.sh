@@ -31,7 +31,11 @@
 #          (DATABASE_URL above all) and updates ONLY OTEL_RESOURCE_ATTRIBUTES;
 #          with OTEL absent from the source list it is ADDED (scenario B);
 #   (#52c) a mocked HTTP 400 makes the api helper exit non-zero WITH the
-#          response body printed (scenario C) — no `-f`-and-swallow.
+#          response body printed (scenario C) — no `-f`-and-swallow;
+#   (#52-poll) the deploy-status poll tolerates transient API failures as
+#          failed ATTEMPTS (helper output shown, counter reset on success)
+#          and gives up only on 3 CONSECUTIVE failures, with the last body
+#          (scenarios D/E: 2x502 -> live; 3x502 -> give-up).
 #
 # Retries/timings default to the workflow's values but are tunable so the
 # rehearsal runs in seconds: POLL_ATTEMPTS/POLL_INTERVAL/HEALTH_ATTEMPTS/
@@ -84,6 +88,7 @@ from urllib.parse import urlparse, parse_qs
 
 state_dir = Path(sys.argv[1])
 deploy_gets = {"n": 0}
+fails = {"n": 0, "plan": ""}   # deploy-status GET failure plan (scenarios F/G)
 
 OWNER = {"id": "usr-dry-run-owner", "name": "dry-run", "email": "owner@example.invalid"}
 
@@ -170,6 +175,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._send(200, json.dumps(page_map.get(cursor, [])))
             return
         if "/deploys/dep-mock-1" in self.path:
+            plan = self._mode("deploy_fail_first")   # first N status GETs -> 502
+            if plan != fails["plan"]:
+                fails["plan"] = plan
+                fails["n"] = 0
+            if plan.isdigit() and fails["n"] < int(plan):
+                fails["n"] += 1
+                self._send(502, json.dumps({
+                    "message": f"transient failure {fails['n']} of {plan}"}))
+                return
             deploy_gets["n"] += 1
             status = "build_in_progress" if deploy_gets["n"] == 1 else "live"
             self._send(200, json.dumps({"id": "dep-mock-1", "status": status}))
@@ -331,16 +345,31 @@ post_deploy() {
 }
 
 poll_deploy() {
-  local i status resp
+  local i status resp consecutive=0 api_err
+  # Same failure semantics as the workflow poll step: an api() failure
+  # (transport or non-2xx) fails the ATTEMPT only — helper output is kept
+  # and shown, a success resets the counter, 3 CONSECUTIVE failures give up.
+  api_err="$RUNNER_TEMP/poll-api.err"
   for i in $(seq 1 "$POLL_ATTEMPTS"); do
-    resp="$(api GET "/services/$RENDER_DEV_SERVICE_ID/deploys/$DEPLOY_ID")"
-    status="$(echo "$resp" | jq -r '.status')"
-    echo "  poll $i/$POLL_ATTEMPTS: ${status:-<no status>}"
-    case "$status" in
-      live) echo "  deploy is live"; return 0 ;;
-      build_failed|update_failed|canceled|deactivated)
-        echo "  deploy ended with status: $status"; return 1 ;;
-    esac
+    if resp="$(api GET "/services/$RENDER_DEV_SERVICE_ID/deploys/$DEPLOY_ID" 2>"$api_err")"; then
+      consecutive=0
+      status="$(echo "$resp" | jq -r '.status')"
+      echo "  poll $i/$POLL_ATTEMPTS: ${status:-<no status>}"
+      case "$status" in
+        live) echo "  deploy is live"; return 0 ;;
+        build_failed|update_failed|canceled|deactivated)
+          echo "  deploy ended with status: $status"; return 1 ;;
+      esac
+    else
+      consecutive=$((consecutive + 1))
+      echo "  poll $i/$POLL_ATTEMPTS: API call failed (consecutive $consecutive/3) — helper output:"
+      cat "$api_err"
+      if [[ "$consecutive" -ge 3 ]]; then
+        echo "  deploy poll gave up after 3 consecutive API failures — last response:"
+        cat "$api_err"
+        return 1
+      fi
+    fi
     sleep "$POLL_INTERVAL"
   done
   echo "  deploy poll timed out"; return 1
@@ -485,7 +514,35 @@ fi
 rm -f "$STATE/patch_mode"
 
 echo ""
-echo "-- scenario D: mutation — trailing space body"
+echo "-- scenario D: mutation — deploy-status GET fails twice, then recovers"
+printf '2' > "$STATE/deploy_fail_first"
+if ( POLL_ATTEMPTS=10; POLL_INTERVAL=1; DEPLOY_ID=dep-mock-1; poll_deploy ) > "$STATE/poll_tol.out" 2>&1; then
+  if grep -qF 'consecutive 2/3' "$STATE/poll_tol.out"; then
+    pass "#52-poll 2 transient 502s tolerated (consecutive counter reset on success); deploy reached live"
+  else
+    fail "#52-poll poll succeeded but the transient-failure path was not exercised"
+  fi
+else
+  fail "#52-poll poll_deploy gave up on 2 transient API failures — tolerance not mirrored"
+fi
+rm -f "$STATE/deploy_fail_first"
+
+echo ""
+echo "-- scenario E: mutation — 3 consecutive deploy-status failures"
+printf '3' > "$STATE/deploy_fail_first"
+if ( POLL_ATTEMPTS=10; POLL_INTERVAL=1; DEPLOY_ID=dep-mock-1; poll_deploy ) > "$STATE/poll_giveup.out" 2>&1; then
+  fail "#52-poll poll_deploy PASSED despite 3 consecutive API failures — cap missing"
+else
+  if grep -qF 'transient failure 3 of 3' "$STATE/poll_giveup.out" && grep -qF 'gave up after 3 consecutive' "$STATE/poll_giveup.out"; then
+    pass "#52-poll 3 consecutive failures give up non-zero WITH the last response body"
+  else
+    fail "#52-poll gave up but the last response body / give-up line was not printed"
+  fi
+fi
+rm -f "$STATE/deploy_fail_first"
+
+echo ""
+echo "-- scenario F: mutation — trailing space body"
 echo "health_mode=trailing"
 printf 'trailing' > "$STATE/health_mode"
 if ( HEALTH_ATTEMPTS=2; HEALTH_INTERVAL=1; health_assert ); then
@@ -495,7 +552,7 @@ else
 fi
 
 echo ""
-echo "-- scenario E: mutation — HTTP 503"
+echo "-- scenario G: mutation — HTTP 503"
 echo "health_mode=503"
 printf '503' > "$STATE/health_mode"
 if ( HEALTH_ATTEMPTS=2; HEALTH_INTERVAL=1; health_assert ); then

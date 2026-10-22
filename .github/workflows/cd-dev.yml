@@ -341,6 +341,11 @@ jobs:
           echo "deploy_id=$DEPLOY_ID" >> "$GITHUB_OUTPUT"
 
       # Bounded poll: 30 attempts x 20 s = 10 min cap. Timeout is RED.
+      # Transient API errors (429/5xx/transport) fail the ATTEMPT, not the
+      # step: the helper's status+body output is captured and shown per
+      # attempt, a successful call resets the counter, and only 3
+      # CONSECUTIVE failures give up RED with the last body. Terminal deploy
+      # statuses and the cap are unaffected.
       - name: Poll deploy status until live
         if: steps.cfg.outputs.configured == 'true'
         env:
@@ -366,15 +371,28 @@ jobs:
             fi
             printf '%s\n' "$payload"
           }
+          CONSECUTIVE=0
+          API_ERR="$RUNNER_TEMP/poll-api.err"
           for i in $(seq 1 30); do
-            RESP="$(api GET "/services/$RENDER_DEV_SERVICE_ID/deploys/$DEPLOY_ID")"
-            STATUS="$(echo "$RESP" | jq -r '.status')"
-            echo "poll $i/30: ${STATUS:-<no status>}"
-            case "$STATUS" in
-              live) echo "deploy is live"; exit 0 ;;
-              build_failed|update_failed|canceled|deactivated)
-                echo "::error::deploy ended with status: $STATUS"; exit 1 ;;
-            esac
+            if RESP="$(api GET "/services/$RENDER_DEV_SERVICE_ID/deploys/$DEPLOY_ID" 2>"$API_ERR")"; then
+              CONSECUTIVE=0
+              STATUS="$(echo "$RESP" | jq -r '.status')"
+              echo "poll $i/30: ${STATUS:-<no status>}"
+              case "$STATUS" in
+                live) echo "deploy is live"; exit 0 ;;
+                build_failed|update_failed|canceled|deactivated)
+                  echo "::error::deploy ended with status: $STATUS"; exit 1 ;;
+              esac
+            else
+              CONSECUTIVE=$((CONSECUTIVE + 1))
+              echo "poll $i/30: API call failed (consecutive $CONSECUTIVE/3) — helper output:"
+              cat "$API_ERR"
+              if [[ "$CONSECUTIVE" -ge 3 ]]; then
+                echo "::error::deploy poll gave up after 3 consecutive API failures — last response:"
+                cat "$API_ERR"
+                exit 1
+              fi
+            fi
             sleep 20
           done
           echo "::error::deploy poll timed out (10 min cap)"; exit 1
