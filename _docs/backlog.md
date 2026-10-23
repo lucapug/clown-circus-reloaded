@@ -2,7 +2,7 @@
 
 **Purpose:** read-only visualization of the groomed backlog's dependency DAG. The canonical task state lives in **GitHub Issues** (plan decision D2); this map is an index, not a second backlog. Regenerate it whenever issues are added, split, or re-linked.
 
-**Snapshot date:** 2026-10-21 (evening) — M2 fully closed (6/6 MUSTs + #19/#20/#24/#27/#30/#33/#35), **M3 complete 3/3** (#39/#40/#41), **M4 groomed (#45–#48)**. M5–M7 issues are added as their milestones enter grooming.
+**Snapshot date:** 2026-10-23 — M2/M3/M4 complete, **C2 achieved 2026-10-22 (one day early)**, **M5 groomed (#58–#60)**. M6/M7 issues are added as their milestones enter grooming.
 
 ```mermaid
 graph TD
@@ -40,7 +40,13 @@ graph TD
         I45["#45 Integration suite in Compose, single-command tests"]
         I46["#46 Playwright E2E happy path (hooks)"]
         I47["#47 GHCR immutable tags + CD deploy-on-green dev (C2)"]
-        I48["#48 Prod service + manual promotion + health monitor (C2)"]
+        I48["#48 Prod service + manual promotion + health monitor (C2) ✅ merged"]
+    end
+
+    subgraph M5["M5 — Ops completion (Oct 23–24): dashboards, alert, on-call drill"]
+        I58["#58 Grafana dashboards-as-code (journey + env/version)"]
+        I59["#59 Alert on user impact (5xx), proven to fire"]
+        I60["#60 On-call drill tier 1 + rollback drill"]
     end
 
     I37["#37 CI-red fix: streak AC-3 × lever-only (PR #38 merge-ready)"]
@@ -74,9 +80,13 @@ graph TD
     I41 --> I46
     I41 --> I47
     I47 --> I48
+
+    I48 --> I58
+    I58 --> I59
+    I59 --> I60
 ```
 
-**Critical path (longest chain):** #1 → #6 → #7 → #8 → #9 → #10 → #39 → #40 → #41 → **#47 → #48** — M3 closed on Oct 21 (one day early); C2 (Oct 23 EOD) watches #47 → #48 (CD green on dev + one manual promotion to prod). #45 and #46 are independent of the C2 chain and fill the parallel slots.
+**Critical path (longest chain):** #1 → … → #41 → #47 → #48 → **#58 → #59 → #60** — C2 ACHIEVED 2026-10-22 (one day early: CD green on dev + manual promotion to prod demonstrated). M5 (5 graded points) is now the critical path toward the Oct-26 submission; #45/#46 merged closed M4 4/4.
 
 **Parallelism available (M4):** #45, #46 and #47 are mutually independent once #41 is merged; #48 waits for #47. Owner-side platform steps for #47/#48 (Render API key/deploy hook, prod Neon database, prod service) can start before the agent cycles.
 
