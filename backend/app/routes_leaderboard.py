@@ -1,7 +1,5 @@
 """Leaderboard API routes (issue #40): POST /scores and GET /leaderboard."""
 
-import os
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -43,13 +41,6 @@ def _record(score) -> ScoreRecord:
 def submit_score(
     submission: ScoreSubmission, db: Session = Depends(get_db)
 ) -> ScoreRecord:
-    # DRILL #60 — injected drill defect (issue #60), default OFF everywhere.
-    # Valid payloads reach this line only after 422 validation; raising here
-    # persists nothing. Activated on dev ONLY via DRILL_DEFECT_SCORES_500=1
-    # (Render env-vars bulk endpoint, owner action). Removed by the labelled
-    # // DRILL #60 follow-up PR after the drill.
-    if os.environ.get("DRILL_DEFECT_SCORES_500") == "1":
-        raise HTTPException(status_code=500, detail="Internal Server Error")
     stored, _created = crud.create_or_get(db, submission)
     if stored is None:
         # Body shape is non-normative (contract: the client only branches on status).
