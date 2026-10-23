@@ -65,6 +65,14 @@
 #          retries with the exact-body assert) logs "health ok: <env>
 #          (attempt N)" and fails on a mutant body.
 #
+# Issue #59 addition (orchestrator instruction; mutation-proven as usual):
+#   (#59)  the REAL ops/grafana-apply.sh validate passes offline with the
+#          new alerting checks (rule JSON, frozen semantics, provisioning
+#          mock round-trip), and a MUTATED COPY of alert-rule.json (for: 5m
+#          + wrong datasource uid) makes the same validate FAIL — proving
+#          the alert checks are not vacuous. The repo tree is never touched
+#          (the mutation happens in a temp copy of ops/grafana*).
+#
 # Retries/timings default to the workflow's values but are tunable so the
 # rehearsal runs in seconds: POLL_ATTEMPTS/POLL_INTERVAL/HEALTH_ATTEMPTS/
 # HEALTH_INTERVAL (the workflow pins 30x20s for both loops).
@@ -915,6 +923,40 @@ else
     fail "#48f monitor guard failed without the visible misconfiguration message"
   fi
 fi
+
+echo ""
+echo "-- scenario O: grafana-apply.sh validate incl. #59 alert checks (real script, temp copy)"
+GRAFANA_TMP="$(mktemp -d /tmp/cd-dry-run-grafana.XXXXXX)"
+cp "$SCRIPT_DIR/grafana-apply.sh" "$GRAFANA_TMP/"
+cp -R "$SCRIPT_DIR/grafana" "$GRAFANA_TMP/grafana"
+GVOUT="$GRAFANA_TMP/validate.out"
+if ( cd "$GRAFANA_TMP" && bash "$GRAFANA_TMP/grafana-apply.sh" validate ) > "$GVOUT" 2>&1 \
+  && grep -q 'ALL CHECKS PASSED' "$GVOUT" \
+  && grep -q 'alert sane: uid ccr-5xx-user-impact' "$GVOUT" \
+  && grep -q 'alert semantics' "$GVOUT" \
+  && grep -q 'mock apply-alert (200/201)' "$GVOUT"; then
+  pass "#59 grafana-apply validate passes with the alert checks + apply-alert mock round-trip ($(grep -c '^PASS:' "$GVOUT") PASS)"
+else
+  fail "#59 grafana-apply validate failed: $(tail -5 "$GVOUT")"
+fi
+# mutation: break the frozen semantics in the COPY only — for: 2m -> 5m and
+# the pinned datasource uid -> a wrong one. The SAME validate must now fail
+# on exactly the alert checks (non-vacuity proof).
+sed -i.bak -e 's/"for": "2m"/"for": "5m"/' -e 's/grafanacloud-prom/grafanacloud-mutated/' \
+  "$GRAFANA_TMP/grafana/alert-rule.json"
+if ( cd "$GRAFANA_TMP" && bash "$GRAFANA_TMP/grafana-apply.sh" validate ) > "$GVOUT" 2>&1; then
+  fail "#59 mutated alert-rule.json still passed validate — the alert checks are vacuous"
+else
+  if grep -q 'FAILURES PRESENT' "$GVOUT" \
+    && grep -q "FAIL: alert insane" "$GVOUT" \
+    && grep -q "AssertionError: 5m" "$GVOUT" \
+    && grep -q 'FAIL: alert constants: rule datasource refs wrong' "$GVOUT"; then
+    pass "#59 mutated copy: validate FAILS on exactly the alert checks (for/datasource refs), dashboards checks unaffected"
+  else
+    fail "#59 mutated copy failed but without the expected alert-check messages: $(grep '^FAIL:' "$GVOUT" | head -5)"
+  fi
+fi
+rm -rf "$GRAFANA_TMP"
 
 echo ""
 if [[ "$FAILED" == 0 ]]; then
