@@ -1,9 +1,11 @@
 name: grafana-apply
 
-# Issue #58 — push ops/grafana/*.json to the Grafana Cloud instance via the
-# HTTP API. workflow_dispatch ONLY (no push/PR triggers — dashboards apply on
+# Issues #58/#59 — push ops/grafana/*-dashboard.json plus the #59 alerting
+# (folder, contact point, alert rule) to the Grafana Cloud instance via the
+# HTTP API. workflow_dispatch ONLY (no push/PR triggers — applies happen on
 # demand, exactly like cd-promote; nothing auto-runs this). GRAFANA_URL is a
-# repo variable, GRAFANA_SA_TOKEN a GitHub secret; both reach the script only
+# repo variable, GRAFANA_SA_TOKEN a GitHub secret, ALERT_EMAIL the
+# owner-confirmed recipient repo variable; all three reach the script only
 # through these env bindings (the token value never appears in the repo).
 
 on:
@@ -23,7 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Validate dashboards (offline)
+      - name: Validate dashboards + alert rule (offline)
         run: |
           bash ops/grafana-apply.sh validate
 
@@ -35,7 +37,17 @@ jobs:
         run: |
           bash ops/grafana-apply.sh apply | tee -a "$GITHUB_STEP_SUMMARY"
 
+      # Issue #59 — one-line addition per the brief: provision the alerting.
+      - name: Apply alerting (folder + contact point + 5xx rule)
+        env:
+          GRAFANA_URL: ${{ vars.GRAFANA_URL }}
+          GRAFANA_SA_TOKEN: ${{ secrets.GRAFANA_SA_TOKEN }}
+          ALERT_EMAIL: ${{ vars.ALERT_EMAIL }}
+        shell: bash
+        run: |
+          bash ops/grafana-apply.sh apply-alert | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Note evidence in the run summary
         if: always()
         run: |
-          echo "Success = two HTTP 200 status:success responses with uid ccr-journey and ccr-env-version (version increments on re-run; no 412, no duplicates)." >> "$GITHUB_STEP_SUMMARY"
+          echo "Success = two HTTP 200 status:success responses with uid ccr-journey and ccr-env-version (version increments on re-run; no 412, no duplicates), plus apply-alert: folder ccr-alerts, contact point ccr-owner-email (email ${{ vars.ALERT_EMAIL }}), alert rule ccr-5xx-user-impact by uid." >> "$GITHUB_STEP_SUMMARY"
