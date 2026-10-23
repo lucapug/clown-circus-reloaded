@@ -9,8 +9,6 @@ only for the #60 on-call drill: with ``DRILL_DEFECT_SCORES_500=1`` a VALID
 
 import uuid
 
-from fastapi.testclient import TestClient
-
 
 def _payload(**overrides) -> dict:
     payload = {
