@@ -970,3 +970,27 @@ Cycle #28 needed **zero rework**: [QA PASS](https://github.com/lucapug/clown-cir
 **Incident (orchestrator-caused, owned):** while the owner played on `npm run dev` from the SHARED working tree, my post-cycle `git checkout main` (leaving `feat/46-playwright-e2e`, where `vite.config.ts` is modified) triggered a Vite restart → page reload → an in-flight game (4–5 lives) reset. Structural fix, applied immediately: a dedicated **detached play worktree** at `../ccr-play` (deps installed; agents never touch it; owner updates between games with `git fetch && git checkout --detach origin/main`). The localStorage ring and leaderboard cache survive — same origin :5173.
 
 **Play report → issue [#57](https://github.com/lucapug/clown-circus-reloaded/issues/57):** a board clown stranded at vx≈0 (no slide, no fall). Related-but-distinct from the deferred "skating" v2 item (vx PERSISTING). No finalized trace (the session died in the restart) — the issue holds the report, asks for a recorder trace at the next occurrence, and poses the 2025-parity + fix-vs-v2 questions to the owner. Recommendation recorded: decide after M5 unless gameplay-breaking (the stranded clown soft-locks only itself; input launch still works).
+
+## 2026-10-23 — Cycle #29 (issue #58, PR #61): dashboards-as-code + the one-character stack-URL diagnosis
+
+### What and why
+
+The Observability criterion's concrete artifact: `ops/grafana/` holds the journey dashboard (`ccr-journey`: per-endpoint rate/duration/errors grouped by `deployment_environment_name`, log + trace panels with `${__value.raw}` dataLinks to Tempo) and the env/version dashboard (`ccr-env-version`: every deploy as a new `service_version` line), applied to Grafana Cloud by `ops/grafana-apply.sh` (offline `validate` = 17 checks incl. no-customer-data greps and a localhost mock round-trip with 401/500 error paths; `apply` idempotent by fixed UID + overwrite) with a dispatch-only workflow. The #52 error-visibility pattern reused throughout; the three stated-not-invented constants (metric stem, cloud datasource UIDs, TraceQL env form) parameterized as commented constants.
+
+### The first apply failed — and the failure was one character
+
+Run 39955442024: offline validate 17/17 PASS, real apply → **HTTP 530, Cloudflare error 1016 (Origin DNS error)** on `pinkmaggie3108.grafana.net`. Diagnosis (orchestrator, two curls): the wildcard `*.grafana.net` resolves ANY subdomain to a gateway CNAME, but the origin lookup fails for non-existent slugs — **the stack slug was `pinkmagpie3108` (magpie), not `pinkmaggie3108`**. The owner's chat message carried the typo; the OTLP endpoint never exposed it because the OTLP gateway is shared (`otlp-gateway-prod-eu-west-2…`), not stack-specific. `GRAFANA_URL` variable corrected → re-dispatch → **both dashboards applied (HTTP 200, status=success, version 1 each)**, datasource UIDs verified against the live stack.
+
+### Outcome and verdicts
+
+[REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/61#issuecomment-6362148907) — zero findings above note (3 polish notes: zero-5xx routes render "no data" rather than a 0-line; the README's "panels aggregate only" overstates since one panel shows raw log lines — safe only because the backend never logs names, which the reviewer re-verified at source; the journey-logs query is unfiltered). The first QA agent stalled on the inactivity timeout (second occurrence — recovery per procedure: stale worktree registration removed, fresh QA with bounded battery); [QA PASS](https://github.com/lucapug/clown-circus-reloaded/pull/61#issuecomment-6362348294) — mutations bite (uid removed, name-injected, guard unset), boundary declared (real apply = orchestrator post-merge). Merged; real apply green (run 39955716405). Owner UI check + screenshot pending (M6 evidence).
+
+### Measured ledger (cycle #29)
+
+PM 324,936 · engineer 2,778,105 · QA 766,499 (fresh; the stalled run unmeasured) · reviewer 437,066 → **≈ 4.31M** measurable. The real apply: zero tokens (pure Actions).
+
+### Lessons
+
+- **Shared-infrastructure endpoints hide identity errors**: the OTLP gateway accepted telemetry for any valid token regardless of the stack slug in our notes — the stack URL was never protocol-verified until an API call needed the origin. Verification debt surfaces at the first consumer.
+- The wildcard-DNS signature (resolves-but-530/1016) is the reusable diagnostic: `*.grafana.net` always resolves; a 530/1016 means WRONG SLUG, not outage.
+- Pipeline error visibility (the #52 convention) printed the Cloudflare body verbatim — one run, one look, root cause obvious.
