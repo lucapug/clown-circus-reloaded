@@ -1013,3 +1013,31 @@ PM 233,994 · engineer 5,163,986 · QA 1,165,213 · reviewer 319,354 → **≈ 6
 
 - The alert design benefited from being groomed AFTER the dashboards: the metric-stem/datasource constants were already parameterized with names — #59 reused them instead of re-deriving (grooming order as a cost lever).
 - The probe vs injected-defect distinction is now load-bearing for M5's integrity: the probe proves the ALERTING LAYER; the #60 drill proves the ON-CALL LAYER with a realistic defect. Different layers, different evidence — documented in three places so the submission cannot conflate them.
+
+## 2026-10-23 — Cycle #31 (issue #60, PR #63–#65): the on-call drill + rollback drill — **M5 COMPLETE**
+
+### What and why
+
+The M5 closer, executed as a real drill: the injection PR #63 (probe removal + the env-gated valid-payload 500, test-passing by design) merged at 15:44Z; the owner set `DRILL_DEFECT_SCORES_500=1` on dev; the orchestrator's sustained burst (140 × 500, 18:03–18:08Z) fired `ccr-5xx-user-impact` → **Firing** (email to the owner, Alerting UI red — owner screenshot). The **on-call subagent was paged with the alert TEXT ONLY** at 18:08Z: no issue link, no drill design, no env-var name.
+
+### The on-call performance (the drill's core measurement)
+
+Root cause in **~8 minutes**: `git log` → marker grep → the gate in `routes_leaderboard.py`; the env activation inferred DEDUCTIVELY (CI-green code + live 500s = the service env carries the gate). Impact characterized precisely: valid payloads 500, invalid 422, **zero data loss** (the raise precedes every write), health/leaderboard unaffected — and a coincidental cold-start one-off GET 500 correctly triaged as not-the-defect. Shipped: [PR #64](https://github.com/lucapug/clown-circus-reloaded/pull/64) (the fix: gate removal, 49 green) + [PR #65](https://github.com/lucapug/clown-circus-reloaded/pull/65) (the runbook remediation entry) + the diagnosis comment on #60. The owner reviewed and merged both (the human review is the drill's gate). Clear: auto-CD deployed the gate-free image → 5xx → 0 → alert → Normal.
+
+**Honest assessment (recorded)**: the `# DRILL #60` marker made root-cause CONFIRMATION instant — a real defect carries no marker. The genuine on-call work was the rest of the arc: impact discrimination (valid-vs-invalid), persistence checks, cold-start triage, and fix scoping. The drill's known limitation, stated in the evidence.
+
+### The rollback drill (SHOULD → done) + a real incident found en route
+
+Three digest-gated promotions on prod: latest (`4e43707`/`e975a8b9…`) → **rollback to previous** (`20c55c2`/`2d2e876c…`) → re-promote current. All health-validated; prod data survived all three swaps. **En route, a REAL incident**: the first-ever valid `POST /scores` on prod (16:00Z) returned a transient 500 (retry → 201; write+read then verified healthy — the drill env had NOT leaked to prod: the plain-text 500 body differs from the drill's JSON signature, and prod's promoted image predates the gate code). Filed as [#66](https://github.com/lucapug/clown-circus-reloaded/issues/66) (low priority: the #10 offline queue already shields users — a 500 is non-definitive → queued → synced). Structural note: the /health-only monitor structurally cannot see write-path failures (decision C) — the trade-off is documented, the follow-up issue holds the options.
+
+### Measured ledger (cycle #31)
+
+PM 211,277 · engineer 1,258,525 · QA 541,468 + 229,307 · reviewer 397,941 · mini-agent 236,836 (trial #11: F401) + on-call agent 522,078 → **≈ 3.40M**. The on-call page-to-PRs: ~8 minutes. Three-day loop total (cycles #19–#31): **≈ 66.9M** measurable.
+
+### M5 COMPLETE (5 rubric points banked)
+
+Observability (2): dashboards-as-code applied live, journey + env/version, both environments, trace-ID correlation story. Alerting (1): the 5xx rule live, **fired and resolved on real traffic**, email delivered, provisioned-by-JSON committed (UI-fallback deviation honestly recorded — the provisioning API is absent on this stack, verified with an admin session). On-call (2): tier-1 drill executed end-to-end with an independent on-call agent on symptoms only, fix PR human-reviewed, plus the demonstrated rollback. The drill also surfaced a real prod latent defect (#66) — the monitoring layer is already earning its keep.
+
+### Next
+
+M6 (docs/demo: README polish, the dashboard/alert screenshots collected, the `.nvmrc` nits, demo artifacts) and M7 (repo public + self-assessment + submission Oct 26). Grooming next session; #57 (board-clown strand) awaits the owner's recorder trace + fix-vs-v2 call; #66 is post-submission unless trivial.
