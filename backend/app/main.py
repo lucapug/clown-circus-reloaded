@@ -9,6 +9,7 @@ image), the backend serves it with an SPA fallback registered last so
 """
 
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -72,6 +73,19 @@ def create_app() -> FastAPI:
     @app.head("/", include_in_schema=False)
     def head_index() -> Response:
         return Response(status_code=200)
+
+    # PROBE #59 — temporary 5xx probe proving the alert fires and clears
+    # (docs/runbook.md "Alert fired → what to do"). Default OFF everywhere:
+    # the env is read PER REQUEST, so the Render dev service flips it on/off
+    # by adding/removing DRILL_PROBE_5XX=1 (env-vars bulk endpoint) without a
+    # code change; prod never gets it and an unset env answers 404
+    # (invisible behind the SPA fallback semantics). Removed by the labelled
+    # // PROBE #59 follow-up PR (decision D2 in the #59 PM brief).
+    @app.get("/__probe/5xx", include_in_schema=False)
+    def probe_5xx() -> Response:
+        if os.environ.get("DRILL_PROBE_5XX") == "1":
+            return Response(status_code=500)
+        raise HTTPException(status_code=404)
 
     if DIST_DIR.is_dir():
         app.mount(
