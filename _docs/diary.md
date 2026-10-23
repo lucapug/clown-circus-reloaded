@@ -994,3 +994,22 @@ PM 324,936 · engineer 2,778,105 · QA 766,499 (fresh; the stalled run unmeasure
 - **Shared-infrastructure endpoints hide identity errors**: the OTLP gateway accepted telemetry for any valid token regardless of the stack slug in our notes — the stack URL was never protocol-verified until an API call needed the origin. Verification debt surfaces at the first consumer.
 - The wildcard-DNS signature (resolves-but-530/1016) is the reusable diagnostic: `*.grafana.net` always resolves; a 530/1016 means WRONG SLUG, not outage.
 - Pipeline error visibility (the #52 convention) printed the Cloudflare body verbatim — one run, one look, root cause obvious.
+
+## 2026-10-23 — Cycle #30 (issue #59, PR #62): the 5xx alert as code — zero rework
+
+### What and why
+
+The Alerting criterion's artifact: `ops/grafana/alert-rule.json` (Grafana-managed multi-dim rule — 5xx rate > 0 per `deployment_environment_name`, `for: 2m`, eval 1m, `noDataState: OK`, summary + runbook_url annotations) provisioned by the extended `grafana-apply.sh` (`apply-alert`: contact point from `ALERT_EMAIL` repo variable with a loud pre-network guard, notification policy, idempotency by uid; the PM's research catch — the dashboard glob would have applied the alert rule as a dashboard — fixed by narrowing to `*-dashboard.json`). Plus the drill probe: an env-gated `GET /__probe/5xx` in main.py (`# PROBE #59` marker, default 404, per-request read, 2 tests) — THIS issue's firing-proof vehicle; #60's drill uses a real injected defect instead, and the probe gets a marked removal PR after M5 (removal plan recorded in 3 places). Dry-run extended (scenario O: real validate + mutated-copy flip).
+
+### Outcome and verdicts
+
+[QA PASS](https://github.com/lucapug/clown-circus-reloaded/pull/62#issuecomment-6366117230) — validate 28 PASS (17 baseline unchanged + 11 alert), mutations bite, `DRILL_PROBE_5XX` grep EMPTY across `.github/` and `ops/` (prod unreachable), backend 51. [REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/62#issuecomment-6365920756) — zero blocker/major/minor; the probe decision explicitly endorsed ("well made — out-of-tree or a temp real defect would both be worse"); notes: the policy-fallback branch lacks offline coverage (watch the `::warning::` at first real apply), the eval interval rides the stack default (stated-not-invented). Boundary: the REAL fire-and-clear on dev = orchestrator+owner post-merge (owner flips the probe env, orchestrator sustains the 5xx, owner receives the email, probe off → clear). Merge pending the owner; `ALERT_EMAIL` repo variable is the one owner input.
+
+### Measured ledger (cycle #30)
+
+PM 233,994 · engineer 5,163,986 · QA 1,165,213 · reviewer 319,354 → **≈ 6.88M**. Zero rework. Three-day loop total (cycles #19–#30): **≈ 61.2M** measurable.
+
+### Lessons
+
+- The alert design benefited from being groomed AFTER the dashboards: the metric-stem/datasource constants were already parameterized with names — #59 reused them instead of re-deriving (grooming order as a cost lever).
+- The probe vs injected-defect distinction is now load-bearing for M5's integrity: the probe proves the ALERTING LAYER; the #60 drill proves the ON-CALL LAYER with a realistic defect. Different layers, different evidence — documented in three places so the submission cannot conflate them.
