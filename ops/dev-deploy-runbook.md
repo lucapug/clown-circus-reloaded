@@ -328,6 +328,24 @@ tuning here — never silently.
 **First demonstrated promotion: <run link> (<date>)** — C2 evidence
 placeholder, filled post-merge.
 
+## Alert fired — what to do
+
+On-call remediation prescriptions for fired alerts accumulate in THIS file
+(`ops/dev-deploy-runbook.md`). Owner-pinned for the #60 drill (injection PR):
+the on-call remediation docs PR targets this section — **not**
+`docs/runbook.md`, which keeps the #59 alert semantics and probe protocol
+records.
+
+### Drill remediation — env-gated `// DRILL #xx` defect (placeholder)
+
+To be filled by the #60 on-call agent's remediation PR
+(`fix/60-oncall-scores-500`) after a drill defect fires. The sub-entry must
+cover, from symptoms only:
+
+> <placeholder — (1) how to confirm an env-gated `// DRILL #xx` defect from
+> symptoms; (2) the env-removal prescription (Render env-vars bulk endpoint
+> → redeploy dev); (3) the follow-up labelled removal-PR step.>
+
 ## Rubric note
 
 The live URL `https://clown-circus-reloaded.onrender.com` with a health-validated
