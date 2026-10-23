@@ -336,15 +336,37 @@ the on-call remediation docs PR targets this section — **not**
 `docs/runbook.md`, which keeps the #59 alert semantics and probe protocol
 records.
 
-### Drill remediation — env-gated `// DRILL #xx` defect (placeholder)
+### Drill remediation — env-gated `// DRILL #xx` defect
 
-To be filled by the #60 on-call agent's remediation PR
-(`fix/60-oncall-scores-500`) after a drill defect fires. The sub-entry must
-cover, from symptoms only:
+Filled by the #60 on-call agent (docs PR `fix/60-oncall-runbook`; the code
+fix rides separately on `fix/60-oncall-scores-500`, PR #64) after the first
+real firing: alert `ccr-5xx-user-impact`, dev, 2026-10-23. From symptoms
+only:
 
-> <placeholder — (1) how to confirm an env-gated `// DRILL #xx` defect from
-> symptoms; (2) the env-removal prescription (Render env-vars bulk endpoint
-> → redeploy dev); (3) the follow-up labelled removal-PR step.>
+1. **Confirm an env-gated `// DRILL #xx` defect from symptoms.** Probe the
+   failing endpoint with bounded curls across payload classes: valid → 5xx,
+   invalid → its normal 4xx contract (e.g. `POST /scores` 500 on valid,
+   422 on invalid), reads and `/health` stay 200. A 5xx that hits ONLY the
+   valid path, BEFORE any persistence (leaderboard reads unchanged, no new
+   rows), with a generic `{"detail":"Internal Server Error"}`, is the
+   env-gate signature. Then `git log --oneline -15` for a `drill(#xx)`
+   injection commit and grep the handler for the `# DRILL #xx` marker and
+   its `os.environ.get("DRILL_DEFECT_…")` gate — diagnosis must come from
+   the marker in code, not from the generic error body. Caveat: a free-tier
+   cold start/restart can throw a ONE-OFF 5xx on any route — never diagnose
+   on a single sample; re-probe until the failure pattern is stable.
+2. **Immediate clear (owner, no code change).** Unset the gate variable
+   (`DRILL_DEFECT_SCORES_500=1` for #60) on the affected Render environment
+   via the env-vars bulk endpoint → the service redeploys → re-probe until
+   the valid-payload 2xx contract returns. This clears user impact without
+   waiting on review.
+3. **Follow-up labelled removal PR.** The gate is dead code once the env
+   var is gone: a PR removes the `// DRILL #xx` block, any imports it alone
+   needed (e.g. `import os` — else ruff F401 fails CI), and the drill-only
+   pinning tests (they assert the gated 5xx and fail after removal). Re-run
+   the unit suite to confirm the pre-injection count (49 for #60). The fix
+   merge → CD redeploys dev → the alert resolves (fire + resolve both
+   recorded per #60).
 
 ## Rubric note
 
