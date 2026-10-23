@@ -1,0 +1,41 @@
+name: grafana-apply
+
+# Issue #58 — push ops/grafana/*.json to the Grafana Cloud instance via the
+# HTTP API. workflow_dispatch ONLY (no push/PR triggers — dashboards apply on
+# demand, exactly like cd-promote; nothing auto-runs this). GRAFANA_URL is a
+# repo variable, GRAFANA_SA_TOKEN a GitHub secret; both reach the script only
+# through these env bindings (the token value never appears in the repo).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: grafana-apply
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate dashboards (offline)
+        run: |
+          bash ops/grafana-apply.sh validate
+
+      - name: Apply dashboards to Grafana Cloud
+        env:
+          GRAFANA_URL: ${{ vars.GRAFANA_URL }}
+          GRAFANA_SA_TOKEN: ${{ secrets.GRAFANA_SA_TOKEN }}
+        shell: bash
+        run: |
+          bash ops/grafana-apply.sh apply | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Note evidence in the run summary
+        if: always()
+        run: |
+          echo "Success = two HTTP 200 status:success responses with uid ccr-journey and ccr-env-version (version increments on re-run; no 412, no duplicates)." >> "$GITHUB_STEP_SUMMARY"
