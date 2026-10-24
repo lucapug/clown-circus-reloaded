@@ -298,6 +298,27 @@ Previous tags are listed in past dev `CD dev` run summaries and in
 Rolling back `service.version` is NOT part of the drill (same acceptance
 as the dev rollback above).
 
+### Rollback drill record (issue #60, 2026-10-23) — DRILL artifact
+
+Executed as part of the #60 on-call drill (the rollback drill, SHOULD →
+done): three digest-gated `cd-promote` dispatches in sequence, each
+health-validated on prod with the exact-body assert; prod leaderboard data
+survived all three swaps. This is the runbook record required by the #60
+acceptance criteria. **This sequence is a DRILL, not a real incident** —
+the real prod incident found the same day is issue #66 (first-write
+transient 500), tracked separately.
+
+| Seq | Action | Tag | Digest (resolved from GHCR live, matched `expected_digest`) | Run |
+| --- | --- | --- | --- | --- |
+| 1 | promote (prod catch-up to dev) | `20261023-162600-4e43707` | `sha256:e975a8b90a6f2363e094c250439de6ef3da08067b1170a80bc015ac2339b8e22` | [#39987934565](https://github.com/lucapug/clown-circus-reloaded/actions/runs/39987934565) |
+| 2 | **rollback** to the previous tag | `20261023-162345-20c55c2` | `sha256:2d2e876c497c4f55ee6367458f1faf139fc85344c1e4610cd18b85022a246c03` | [#39988252897](https://github.com/lucapug/clown-circus-reloaded/actions/runs/39988252897) |
+| 3 | re-promote current | `20261023-162600-4e43707` | `sha256:e975a8b90a6f2363e094c250439de6ef3da08067b1170a80bc015ac2339b8e22` | [#39988948328](https://github.com/lucapug/clown-circus-reloaded/actions/runs/39988948328) |
+
+The drill demonstrated the exact documented mechanism above: the rollback
+dispatch is step 2 — same workflow, the previous tag + its digest; prod
+ended back on the latest tag (step 3). `service.version` rollback was NOT
+performed (accepted, as stated above).
+
 ### Environment layout
 
 - Render environment **"Development"**: dev service
