@@ -1102,3 +1102,5 @@ QA 611,390 · reviewer 240,823 · KB-review agents 479,369 + 275,347 + 351,367 �
 ### Next
 
 **M6 execution on #68** — now the largest open work (the docs face carries 8 graded points): README per KB-08, evidence/pack/permissions docs, role-file frontmatter, one distilled skill, `.env.example`. Owner inputs queued: deadline confirmation, dashboard screenshots (filters visible), the two-session-ritual video on prod. Then M7 on #69. Follow-ups unchanged: #57 trace, #66 traceback, `DRILL_PROBE_5XX` hygiene on dev.
+
+**Addendum (same day): the deadline question is RESOLVED.** The owner confirmed on the course platform: submission deadline = **2026-10-26** (platform supersedes KB 01 p.13, whose slot dates are outdated). The plan's original date was correct all along; the Oct-25 EOD scope freeze stands. M6 today, M7 tomorrow.

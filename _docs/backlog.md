@@ -96,7 +96,7 @@ graph TD
     I68 --> I69
 ```
 
-**Critical path (longest chain):** #1 → … → #48 → #58 → #59 → #60 → **#68 → #69** — M5 COMPLETE (all three issues closed; #60 via the docs-only PR #67, cycle #32); M6 (#68) then M7 (#69) are the final path toward submission (date to be confirmed on the platform — see #69 Addendum 3). Owner inputs pending inside #68: demo screenshots (filters visible) + the two-session-ritual video on prod. Inside #69: the public flip and the platform submission are owner actions; peer review of 3 projects is mandatory.
+**Critical path (longest chain):** #1 → … → #48 → #58 → #59 → #60 → **#68 → #69** — M5 COMPLETE (all three issues closed; #60 via the docs-only PR #67, cycle #32); M6 (#68) then M7 (#69) are the final path toward the **2026-10-26 submission deadline (owner-confirmed on the platform 2026-10-24, superseding KB 01 p.13)**; scope freeze Oct 25 EOD. Owner inputs pending inside #68: demo screenshots (filters visible) + the two-session-ritual video on prod. Inside #69: the public flip and the platform submission are owner actions; peer review of 3 projects is mandatory.
 
 **Parallelism available (M4):** #45, #46 and #47 are mutually independent once #41 is merged; #48 waits for #47. Owner-side platform steps for #47/#48 (Render API key/deploy hook, prod Neon database, prod service) can start before the agent cycles.
 
