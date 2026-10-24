@@ -2,7 +2,7 @@
 
 **Purpose:** read-only visualization of the groomed backlog's dependency DAG. The canonical task state lives in **GitHub Issues** (plan decision D2); this map is an index, not a second backlog. Regenerate it whenever issues are added, split, or re-linked.
 
-**Snapshot date:** 2026-10-23 — M2/M3/M4 complete, **C2 achieved 2026-10-22 (one day early)**, **M5 groomed (#58–#60)**. M6/M7 issues are added as their milestones enter grooming.
+**Snapshot date:** 2026-10-24 — M0–M4 complete, C1/C2 both passed, **M5 evidence-complete (#60 closing via PR #67, docs-only)**, **M6/M7 groomed (#68, #69)**.
 
 ```mermaid
 graph TD
@@ -49,6 +49,14 @@ graph TD
         I60["#60 On-call drill tier 1 + rollback drill"]
     end
 
+    subgraph M6["M6 — Docs/demo (Oct 24–25): README, agent-work evidence, pack, demo artifacts"]
+        I68["#68 README completed state + evidence/pack docs + demo artifacts"]
+    end
+
+    subgraph M7["M7 — Submission (Oct 25–26): self-assessment, flip, submit, peer review"]
+        I69["#69 Self-assessment (12 criteria) + final promotion + D11 flip + submission"]
+    end
+
     I37["#37 CI-red fix: streak AC-3 × lever-only (PR #38 merge-ready)"]
 
     I1 --> I3
@@ -84,9 +92,11 @@ graph TD
     I48 --> I58
     I58 --> I59
     I59 --> I60
+    I60 --> I68
+    I68 --> I69
 ```
 
-**Critical path (longest chain):** #1 → … → #41 → #47 → #48 → **#58 → #59 → #60** — C2 ACHIEVED 2026-10-22 (one day early: CD green on dev + manual promotion to prod demonstrated). M5 (5 graded points) is now the critical path toward the Oct-26 submission; #45/#46 merged closed M4 4/4.
+**Critical path (longest chain):** #1 → … → #48 → #58 → #59 → #60 → **#68 → #69** — M5 evidence is complete (#60 closes via the docs-only PR #67); M6 (#68) then M7 (#69) are the final path toward the Oct-26 submission. Owner inputs pending inside #68: demo screenshots + video. Inside #69: the public flip and the platform submission are owner actions; peer review of 3 projects is mandatory.
 
 **Parallelism available (M4):** #45, #46 and #47 are mutually independent once #41 is merged; #48 waits for #47. Owner-side platform steps for #47/#48 (Render API key/deploy hook, prod Neon database, prod service) can start before the agent cycles.
 
