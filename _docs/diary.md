@@ -1065,3 +1065,40 @@ M6 (docs/demo: README polish, the dashboard/alert screenshots collected, the `.n
 **Lezioni vive per la nuova sessione:** checkout-main-first su ogni write; smoke = il comando che gira in CI (mai `tsc --noEmit` nudo); brief-vs-spec → vince la spec; browser automation = mechanism checks only; riprodurre i parser localmente prima di iterare sul cloud; **milestone-complete claims devono combaciare col tracker** (la lezione di stamattina: il tracker aveva ragione, il diario no).
 
 **Per l'owner — 3 cose aperte non bloccanti:** (1) #57: traccia recorder alla prossima occorrenza + decisione fix-vs-v2; (2) #66: traceback dai Render logs (post-submission ok); (3) rimozione igiene di `DRILL_PROBE_5XX` da dev se ancora presente.
+
+## 2026-10-24 — Cycle #32 (issue #60, PR #67): the drill's final act — then grooming + full-KB alignment
+
+### What and why
+
+The session handoff (this morning) prescribed a "marked removal PR" deleting the `DRILL_DEFECT_SCORES_500` gate + its 3 tests and recording the rollback drill. **Primary-source verification inverted the handoff**: the on-call fix PR #64 (`0e916a8`) had ALREADY absorbed the code half — the smallest fix IS the removal (gate + `import os` + 3 drill tests deleted; repo-wide grep zero). The genuine remainder was the brief §2.6(b) half: the rollback-drill record in `ops/dev-deploy-runbook.md` — the drill had been executed (three `cd-promote` dispatches) but recorded only in #60's drill-record comment, not in the file the acceptance criteria name.
+
+The slim cycle shipped exactly that: a docs-only PR (+21 lines) adding the dated "Rollback drill record (issue #60, 2026-10-23) — DRILL artifact" — three digest-gated dispatches (promote `4e43707` → **rollback** `20c55c2` → re-promote `4e43707`) with run URLs, tags, and FULL digests taken from the runs' own `resolved digest of <tag>` log lines (the gh token lacks `read:packages`; the logs are the primary source), explicitly labelled DRILL with a cross-ref to #66 (the same-day real incident). The §2.6 deviation (code half already absorbed) documented in the PR body per brief §7.
+
+### Outcome and verdicts
+
+[REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/67#issuecomment-6381380182) — zero blockers/majors/minors; two notes (PR-body wording imprecision — the substantive no-dead-code claim verified true; the pre-existing C2 placeholder correctly left out of scope, tracked in #68). [QA PASS](https://github.com/lucapug/clown-circus-reloaded/pull/67#issuecomment-6381401124) — 7/7 with evidence: diff scope, record accuracy vs primary sources (digests byte-identical, `expected_digest matched` + `health ok` in all three runs), drill-from-real labelling, no secrets, AC traceability, suites OBSERVED green (252+49). One pre-existing finding routed to #68 (runbook AC2 stale since #45 — the loopback fixture matches the secrets grep). CI 6/6 on the branch. **Merged by the owner 07:43:55Z → #60 CLOSED (COMPLETED) → `in-progress` removed → M5 COMPLETE ON THE TRACKER** — the D2 lesson from this morning applied: the claim now matches the canonical tracker.
+
+Post-merge: CI success → CD dev success on the merge commit → **`POST /scores` → 201 with persistence** (entry id 5 read back via `/leaderboard` 200); a first probe with an over-long name took 422 — the drill's valid-vs-invalid discrimination re-proved itself unprompted. M5's 5 rubric points are now banked AND tracker-consistent.
+
+### Grooming + full-KB alignment (owner request)
+
+- **M6 = [#68](https://github.com/lucapug/clown-circus-reloaded/issues/68), M7 = [#69](https://github.com/lucapug/clown-circus-reloaded/issues/69)** created in the four-section D2 format; labels `M6`/`M7` minted; backlog map updated (`4e717fa`; critical path now #60 → #68 → #69).
+- **The owner added KB 08 ("How to Write a Good README", A. Grigorev 2026-07-16) and asked for a full-KB pass.** PDF 08 read in full here; 02+04, 03+05, 06+01 passed by three KB-review subagents. #68 restructured on KB-08's 16 sections / 4 parts with new ACs (`.env.example` — verified absent; the 8-item "Common mistakes" checklist; the "AI drafts, human verifies" protocol; role-file frontmatter `name:`/`description:` per [04] p.13; one real skill in `.agents/skills/` per [04] p.9; the four-pillar extension pack; the graph diagram; the four-level vocabulary; the #60 incident as a reconstructable timeline per [01] p.9; rollback line in the README per [06] p.19; dashboard screenshots WITH filter dropdowns per [06] p.15). #69 gained the self-evaluation protocol ([08] §Self-evaluation), the pre-empted CI-scope deviation (unit-only CI gate vs [05] pp.11–12 — cite, don't hide), peer-review scheduling, and the D11 flip-surface caution (no raw Grafana URLs; `ops/` enters the logged-out check).
+
+### ⚠️ Open item routed to the owner: the deadline
+
+KB 01 p.13 states "Project 1: submit by **2026-10-19**, peer reviews by **2026-10-26**; Project 2: submit by **2026-11-09**, peer reviews by **2026-11-16**", deferring to the platform. The plan's 2026-10-26 submission date matches Project 1's PEER-REVIEW deadline, not either slot's submit date. If this is Project 2, M7 gains ~2 weeks of buffer and the Oct-25 freeze can relax. Dates in plan/#69 intentionally untouched until the owner checks the platform.
+
+### Measured ledger (cycle #32)
+
+QA 611,390 · reviewer 240,823 · KB-review agents 479,369 + 275,347 + 351,367 → **≈ 1.96M** subagent-measured (two failed dispatches before a retry — provider concurrency — unmeasured). Four-day loop total (cycles #19–#32): **≈ 68.9M**.
+
+### Lessons
+
+- **Handoff summaries err in BOTH directions**: yesterday's handoff over-declared an M5-claim; today's under-derived the removal PR — describing work the on-call fix had already done. The recovery is the same in both cases: primary sources (the #64 diff, repo grep) before writing a plan. Verify-then-write saved a no-op code PR and shrank the cycle to docs-only.
+- **The course KB is a requirements surface wider than the rubric**: the full-KB pass surfaced concrete, checkable artifacts the rubric never names (frontmatter, skills, `.env.example`, incident timelines, panel-explained screenshots) that graders live inside. Aligning the groomed issues to the KB before execution is cheap; aligning after review is rework.
+- **The drill keeps earning post-drill**: the post-merge 422-on-invalid probe was a free re-demonstration that the validation contract survived the removal — evidence for free in the cycle record.
+
+### Next
+
+**M6 execution on #68** — now the largest open work (the docs face carries 8 graded points): README per KB-08, evidence/pack/permissions docs, role-file frontmatter, one distilled skill, `.env.example`. Owner inputs queued: deadline confirmation, dashboard screenshots (filters visible), the two-session-ritual video on prod. Then M7 on #69. Follow-ups unchanged: #57 trace, #66 traceback, `DRILL_PROBE_5XX` hygiene on dev.
