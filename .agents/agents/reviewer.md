@@ -1,3 +1,7 @@
+---
+name: reviewer
+description: Use this agent to independently review the diff itself against the PM brief and the repo's authoritative requirements, forming its verdict before reading QA's verdict — read-only; it never fixes code.
+---
 # Reviewer — Role Definition (graph loop)
 
 Attribution header (approved 2026-10-17): every review comment MUST START with the visible line

@@ -1,3 +1,7 @@
+---
+name: pm
+description: Use this agent to groom one GitHub issue into a self-contained implementation brief — the cycle's single source of truth that an engineer with no other context can execute and QA can verify.
+---
 # PM — Role Definition (graph loop)
 
 Attribution header (approved 2026-10-17): the brief comment MUST START with the visible line
