@@ -1041,3 +1041,27 @@ Observability (2): dashboards-as-code applied live, journey + env/version, both 
 ### Next
 
 M6 (docs/demo: README polish, the dashboard/alert screenshots collected, the `.nvmrc` nits, demo artifacts) and M7 (repo public + self-assessment + submission Oct 26). Grooming next session; #57 (board-clown strand) awaits the owner's recorder trace + fix-vs-v2 call; #66 is post-submission unless trivial.
+
+## 2026-10-24 — Session handoff (fresh-chat): start-of-day state
+
+**Contesto del passaggio:** la sessione del 21–23/10 ha superato le 500k parole di contesto; l'owner richiede handoff su chat fresca. Questa entry è lo stato autoritativo di inizio giornata.
+
+### Stato al passaggio (24/10 morning)
+
+- **M0–M4 complete.** C1 passata il 21/10 (PASSED, con il finding merge-order fixato in giornata); C2 **achievable→ACHIEVED il 22/10, un giorno in anticipo** (CD deploy-on-green su dev dimostrata zero-touch + promozione manuale a prod digest-gated, run 39777647379; rollback drill a 3 atti su #60).
+- **M5: lavoro ed evidenze COMPLETE, ma issue #60 ancora APERTA** (label `must,in-progress,M5` — l'owner ha ragione: "M5 completa" era prematuro rispetto al tracker, D2 dice che le GitHub Issues sono canoniche). Manca l'ultimo atto del ciclo di vita del drill: **la PR di rimozione marcata** (decisione D2 del brief #60) — rimuovere il gate `DRILL_DEFECT_SCORES_500` da `backend/app/routes_leaderboard.py` (prima statement del valid-payload path, marker `# DRILL #60`), i suoi 3 test in `backend/tests/test_drill_defect_scores_500.py`, e registrare i tre URL di rollback drill nel runbook (`ops/dev-deploy-runbook.md`). PR con `Closes #60` → M5 label complete. Motivo(addizionale) per farla PRIMA della sottomissione: il repo va pubblico (D11) e un gate 500 intenzionale, per quanto documentato, non deve stare nel codice consegnato.
+- **Issue aperte (3):** #60 (sopra) · #57 `[bug]` play report board-clown strand — aspetta traccia recorder dall'owner + decisione fix-now vs v2 · #66 `[bug]` first-write 500 transitorio (riprodotto ANCHE su dev il 23/10 sera; + il pattern deploy-swap-window documentato nel commento serale) — candidata post-sottomissione.
+- **Servizi:** dev + prod LIVE e sani (200); prod sul tag `20261023-162600-4e43707` (digest `e975a8b9…`, include drill-removal? NO — include tutto tranne la rimozione del gate, che è appunto la PR da fare); health monitor cron `*/15` verde; alert `ccr-5xx-user-impact` in Normal (fired+resolved evidence su #59, drill record su #60).
+- **Setup credenziali/variabili (tutto configurato):** GitHub secrets `RENDER_API_KEY`, `GRAFANA_SA_TOKEN`; repo variables `RENDER_DEV_SERVICE_ID`, `RENDER_PROD_SERVICE_ID`, `GRAFANA_URL` (https://pinkmagpie3108.grafana.net — ⚠️ magPIE non maggie), `DEV_HEALTH_URL`, `PROD_HEALTH_URL`, `ALERT_EMAIL`. Owner ha rimosso `DRILL_DEFECT_SCORES_500` da dev (23/10 sera); la variabile `DRILL_PROBE_5XX` se ancora presente su dev è INERTE (la route probe è stata rimossa dal codice in #63) — rimuoverla per igiene.
+- **Play worktree owner:** `../ccr-play` (detached su main; aggiornamento tra le partite: `git fetch && git checkout --detach origin/main`).
+- **Ledger 3 giorni (21–23/10):** ≈ 66.9M token subagent misurati, 12 cicli, 17 PR mergiate, 30 issue create (27 chiuse), zero emergenze non gestite.
+
+### Prime attività della nuova sessione (ordine)
+
+1. **Ciclo slim: PR di rimozione drill** (chiude #60 → M5 complete ON TRACKER): branch `chore/60-drill-removal`, rimozione gate + 3 test + runbook URLs, `Closes #60`, attribution `engineer.md@b0d2df9`, slim cycle (engineer → QA + reviewer). Post-merge: auto-CD → verificare `POST /scores` 201 su dev.
+2. **Grooming M6 + M7** (ultimi milestone): M6 = README/docs polish (nit `.nvmrc` in README:32; AGENTS.md già corretto), **rimozione marcata già fatta al punto 1**, demo artifacts (screenshot owner: dashboard ccr-journey, alert Firing/History, leaderboard dev+prod), agent-work-evidence aggiornato. M7 = self-assessment sui 12 criteri finali, **D11: flip repo pubblico + pin SHA**, submission + peer review (3 progetti, obbligatorie).
+3. **Follow-up da non dimenticare:** #57 (owner: traccia + decisione) · #66 (owner: traceback da Render logs ~16:00Z; fix candidato = warm-up lifespan) · la rimozione della variabile `DRILL_PROBE_5XX` su dev se presente.
+
+**Lezioni vive per la nuova sessione:** checkout-main-first su ogni write; smoke = il comando che gira in CI (mai `tsc --noEmit` nudo); brief-vs-spec → vince la spec; browser automation = mechanism checks only; riprodurre i parser localmente prima di iterare sul cloud; **milestone-complete claims devono combaciare col tracker** (la lezione di stamattina: il tracker aveva ragione, il diario no).
+
+**Per l'owner — 3 cose aperte non bloccanti:** (1) #57: traccia recorder alla prossima occorrenza + decisione fix-vs-v2; (2) #66: traceback dai Render logs (post-submission ok); (3) rimozione igiene di `DRILL_PROBE_5XX` da dev se ancora presente.
