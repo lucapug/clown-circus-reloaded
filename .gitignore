@@ -17,6 +17,7 @@ backend/clowncircus.db
 # Env
 .env
 .env.*
+!.env.example
 
 # Editor
 .idea/
