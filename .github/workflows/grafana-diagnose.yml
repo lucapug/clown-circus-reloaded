@@ -32,12 +32,16 @@ jobs:
           import sys
 
           kind = sys.argv[1] if len(sys.argv) > 1 else "raw"
-          raw = sys.stdin.read()
-          try:
-              d = json.loads(raw)
-          except Exception:
-              print("PARSE FAIL, raw head:", raw[:400])
-              sys.exit(0)
+          if kind in ("selector", "lokiquery"):
+              raw = ""
+              d = {}
+          else:
+              raw = sys.stdin.read()
+              try:
+                  d = json.loads(raw)
+              except Exception:
+                  print("PARSE FAIL, raw head:", raw[:400])
+                  sys.exit(0)
 
           def ts(t):
               try:
@@ -122,6 +126,14 @@ jobs:
           curl -sS -w '\nHTTP_STATUS:%{http_code}\n' -H "Authorization: Bearer $GRAFANA_TOKEN" -H 'Content-Type: application/json' -d @/tmp/q.json "$GRAFANA_URL/api/ds/query" > /tmp/r.txt
           tail -1 /tmp/r.txt
           head -n -1 /tmp/r.txt | python3 /tmp/fmt.py prom
+          echo "(raw response head:)"
+          head -n -1 /tmp/r.txt | head -c 500
+          echo ""
+          printf '{"queries":[{"refId":"A","datasource":{"type":"prometheus","uid":"grafanacloud-prom"},"expr":"sum by (deployment_environment_name, http_route) (increase(http_server_request_duration_seconds_count{http_response_status_code=~\\"5..\\"}[31h]))","queryType":"range","intervalMs":3600000,"maxDataPoints":10}],"from":"%s","to":"%s"}' "$FROM" "$TO" > /tmp/q2.json
+          echo "## 5xx total increase over the whole window (any 5xx in ~31h):"
+          curl -sS -w '\nHTTP_STATUS:%{http_code}\n' -H "Authorization: Bearer $GRAFANA_TOKEN" -H 'Content-Type: application/json' -d @/tmp/q2.json "$GRAFANA_URL/api/ds/query" > /tmp/r2.txt
+          tail -1 /tmp/r2.txt
+          head -n -1 /tmp/r2.txt | python3 /tmp/fmt.py prom
 
       - name: Alert rule state and active instances
         env:
@@ -138,6 +150,18 @@ jobs:
             "$GRAFANA_URL/api/prometheus/grafana/api/v1/alerts" > /tmp/b.txt
           tail -1 /tmp/b.txt
           head -n -1 /tmp/b.txt | python3 /tmp/fmt.py alerts
+
+      - name: Live alert rule definition (provisioning API)
+        env:
+          GRAFANA_TOKEN: ${{ secrets.GRAFANA_SA_TOKEN }}
+          GRAFANA_URL: ${{ vars.GRAFANA_URL }}
+        run: |
+          echo "## /api/v1/provisioning/alert-rules/ccr-5xx-user-impact (raw — check noDataState):"
+          curl -sS -w '\nHTTP_STATUS:%{http_code}\n' -H "Authorization: Bearer $GRAFANA_TOKEN" \
+            "$GRAFANA_URL/api/v1/provisioning/alert-rules/ccr-5xx-user-impact" > /tmp/pr.txt
+          tail -1 /tmp/pr.txt
+          head -n -1 /tmp/pr.txt | head -c 2500
+          echo ""
 
       - name: Error logs at the known windows (Loki)
         env:
