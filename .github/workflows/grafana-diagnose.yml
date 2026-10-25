@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Context
-        run: date -u +"run at: %Y-%m-%dT%H:%M:%SZ"
+        run: date -u +"run_at %Y-%m-%dT%H:%M:%SZ"
 
       - name: 5xx requests by env and route (range)
         env:
