@@ -346,8 +346,8 @@ free-tier keep-warm. Cold-start tuning rule: if a ~1-min cold start ever
 trips the 3 × 10 s budget, widen the retry sleep to 30 s and record the
 tuning here — never silently.
 
-**First demonstrated promotion: <run link> (<date>)** — C2 evidence
-placeholder, filled post-merge.
+**First demonstrated promotion: [run 39777647379](https://github.com/lucapug/clown-circus-reloaded/actions/runs/39777647379) (2026-10-22)** — C2 evidence
+filled: workflow "CD promote to prod", conclusion success (2026-10-22T12:21:18Z).
 
 ## Alert fired — what to do
 
@@ -418,11 +418,15 @@ If the service was idle, the first attempt may take ~1 minute to wake it.
 **AC2 — credentials only in platform secrets:**
 
 ```sh
-grep -rEn 'postgres(ql)?://[^[:space:]]*:[^[:space:]]*@' ops/
+grep -rEn 'postgres(ql)?://[^[:space:]]*:[^[:space:]]*@' ops/ --exclude=test-integration.sh
 ```
 
 Expected output: no matches (grep exits 1, prints nothing). The runbook
-contains the name `DATABASE_URL` and placeholders only.
+contains the name `DATABASE_URL` and placeholders only. The one known
+match excluded above, `ops/test-integration.sh:23`, is the loopback-only
+(`127.0.0.1`) fixture credential of the isolated integration Compose
+project — accepted dev-only since #45 (`b9d13b2`); it is never read by
+any deployed service.
 
 Cross-check: in the Render dashboard, the service **Logs** tab at startup
 shows the line `database backend: postgres` with no credential fragments.
