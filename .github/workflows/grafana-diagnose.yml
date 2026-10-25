@@ -1,0 +1,241 @@
+name: Grafana diagnose (read-only)
+
+# Diagnostic tool for the #66 / alert-firing investigation (2026-10-25).
+# READ-ONLY: queries /api/ds/query and the Prometheus-compatible rules/alerts
+# endpoints only — no configuration is mutated, and the token is never printed.
+# Scratch-branch tool (ops/grafana-diagnose); not intended to merge.
+
+on:
+  workflow_dispatch:
+    inputs:
+      hours_back:
+        description: "Hours back from now for the 5xx series"
+        default: "32"
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Context
+        run: date -u +"run at: %Y-%m-%dT%H:%M:%SZ"
+
+      - name: 5xx requests by env and route (range)
+        env:
+          GRAFANA_TOKEN: ${{ secrets.GRAFANA_SA_TOKEN }}
+          GRAFANA_URL: ${{ vars.GRAFANA_URL }}
+        run: |
+          set -euo pipefail
+          H="${{ inputs.hours_back }}"
+          FROM=$(( $(date -u +%s) - H * 3600 ))000
+          TO=$(date -u +%s)000
+          printf '{"queries":[{"refId":"A","datasource":{"type":"prometheus","uid":"grafanacloud-prom"},"expr":"sum by (deployment_environment_name, http_route) (increase(http_server_request_duration_seconds_count{http_response_status_code=~\\"5..\\"}[15m]))","queryType":"range","intervalMs":300000,"maxDataPoints":600}],"from":"%s","to":"%s"}' "$FROM" "$TO" > /tmp/q.json
+          echo "## 5xx increase[15m] by env/route, last ${H}h — non-zero points only:"
+          curl -sS -w '\nHTTP_STATUS:%{http_code}\n' -H "Authorization: Bearer $GRAFANA_TOKEN" -H 'Content-Type: application/json' -d @/tmp/q.json "$GRAFANA_URL/api/ds/query" > /tmp/r.txt
+          tail -1 /tmp/r.txt
+          head -n -1 /tmp/r.txt | python3 -c '
+          import json, sys, datetime
+          raw = sys.stdin.read()
+          try:
+              d = json.loads(raw)
+          except Exception:
+              print("PARSE FAIL, raw head:", raw[:400]); sys.exit(0)
+          frames = (d.get("results", {}).get("A") or {}).get("frames", [])
+          if not frames:
+              print("(no frames)", json.dumps(d)[:400]); sys.exit(0)
+          printed = False
+          for f in frames:
+              labels = f.get("schema", {}).get("labels") or {}
+              vals = (f.get("data") or {}).get("values", [])
+              if not vals or len(vals) < 2:
+                  continue
+              ts, series = vals[0], vals[1]
+              hits = []
+              for t, v in zip(ts, series):
+                  if v and v > 0:
+                      try:
+                          when = datetime.datetime.fromtimestamp(float(t) / 1000, datetime.timezone.utc).strftime("%m-%d %H:%M")
+                      except Exception:
+                          when = str(t)
+                      hits.append((when, v))
+              if hits:
+                  printed = True
+                  env = labels.get("deployment_environment_name", "?")
+                  route = labels.get("http_route", "?")
+                  print("--- %s %s: %d non-zero 15m-windows" % (env, route, len(hits)))
+                  print("    " + ", ".join("%s=%g" % (w, v) for w, v in hits))
+          if not printed:
+              print("(all series zero in the window)")
+          '
+
+      - name: Alert rule state and active instances
+        env:
+          GRAFANA_TOKEN: ${{ secrets.GRAFANA_SA_TOKEN }}
+          GRAFANA_URL: ${{ vars.GRAFANA_URL }}
+        run: |
+          set -euo pipefail
+          for EP in rules alerts; do
+            echo "## /api/prometheus/grafana/api/v1/$EP:"
+            curl -sS -w '\nHTTP_STATUS:%{http_code}\n' -H "Authorization: Bearer $GRAFANA_TOKEN" \
+              "$GRAFANA_URL/api/prometheus/grafana/api/v1/$EP" > /tmp/a.txt
+            tail -1 /tmp/a.txt
+            head -n -1 /tmp/a.txt | python3 -c '
+            import json, sys
+            raw = sys.stdin.read()
+            try:
+                d = json.loads(raw)
+            except Exception:
+                print("PARSE FAIL, raw head:", raw[:400]); sys.exit(0)
+            data = d.get("data", d)
+            if isinstance(data, dict) and "groups" in data:
+                for g in data.get("groups", []):
+                    for r in g.get("rules", []):
+                        print(r.get("state"), "|", r.get("name"), "| health:", r.get("health"))
+                        for a in r.get("alerts", []):
+                            print("   instance:", a.get("state"), "| activeAt:", a.get("activeAt"), "| labels:", a.get("labels"))
+            elif isinstance(data, dict) and "alerts" in data:
+                alerts = data.get("alerts", [])
+                if not alerts:
+                    print("(no active instances)")
+                for a in alerts:
+                    print(a.get("state"), "|", (a.get("labels") or {}).get("alertname"), "| activeAt:", a.get("activeAt"))
+            else:
+                print(json.dumps(d)[:600])
+            '
+          done
+
+      - name: Error logs at the known windows (Loki)
+        env:
+          GRAFANA_TOKEN: ${{ secrets.GRAFANA_SA_TOKEN }}
+          GRAFANA_URL: ${{ vars.GRAFANA_URL }}
+        run: |
+          set -euo pipefail
+          SELECTOR=$(python3 -c '
+          import json
+          d = json.load(open("ops/grafana/journey-dashboard.json"))
+          found = []
+          def walk(o):
+              if isinstance(o, dict):
+                  ds = o.get("datasource")
+                  if isinstance(ds, dict) and ds.get("type") == "loki" and isinstance(o.get("expr"), str):
+                      found.append(o["expr"])
+                  for v in o.values():
+                      walk(v)
+              elif isinstance(o, list):
+                  for v in o:
+                      walk(v)
+          walk(d)
+          print(found[0] if found else "")
+          ')
+          if [ -z "$SELECTOR" ]; then SELECTOR='{service_name=~".+"}'; echo "(selector not found — using catch-all)"; fi
+          echo "## Loki selector (from the committed journey dashboard): $SELECTOR"
+          EXPR_ERR="$SELECTOR |~ \"(?i)error|traceback|exception\""
+          WINDOWS=(
+            "2026-10-23T16:45:00Z 2026-10-23T17:15:00Z owner-reported~19:00CEST-firing"
+            "2026-10-24T04:50:00Z 2026-10-24T05:50:00Z 07:00CEST-firing+monitor-fail-05:40Z"
+            "2026-10-24T08:50:00Z 2026-10-24T09:50:00Z 11:00CEST-firing+monitor-fail-09:39Z"
+            "2026-10-24T13:00:00Z 2026-10-24T13:15:00Z owner-dev-session-Luc-entries-13:03-13:07Z"
+            "2026-10-24T14:30:00Z 2026-10-24T14:45:00Z orchestrator-probes-GET-500-both-envs"
+            "2026-10-24T16:45:00Z 2026-10-24T20:45:00Z continuous-firing-report+monitor-fail-20:38Z"
+          )
+          for W in "${WINDOWS[@]}"; do
+            S=$(echo "$W" | cut -d" " -f1)
+            E=$(echo "$W" | cut -d" " -f2)
+            LABEL=$(echo "$W" | cut -d" " -f3)
+            FROM=$(date -u -d "$S" +%s)000
+            TO=$(date -u -d "$E" +%s)000
+            python3 - "$FROM" "$TO" "$EXPR_ERR" > /tmp/q.json <<'PY'
+          import json, sys
+          print(json.dumps({"queries": [{"refId": "A", "datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": sys.argv[3], "queryType": "range", "maxLines": 80}], "from": sys.argv[1], "to": sys.argv[2]}))
+          PY
+            echo "### Window $S -> $E ($LABEL):"
+            curl -sS -w '\nHTTP_STATUS:%{http_code}\n' -H "Authorization: Bearer $GRAFANA_TOKEN" -H 'Content-Type: application/json' -d @/tmp/q.json "$GRAFANA_URL/api/ds/query" > /tmp/l.txt
+            tail -1 /tmp/l.txt
+            head -n -1 /tmp/l.txt | python3 -c '
+          import json, sys, datetime
+          raw = sys.stdin.read()
+          try:
+              d = json.loads(raw)
+          except Exception:
+              print("PARSE FAIL, raw head:", raw[:300]); sys.exit(0)
+          frames = (d.get("results", {}).get("A") or {}).get("frames", [])
+          n = 0
+          for f in frames:
+              vals = (f.get("data") or {}).get("values", [])
+              if not vals or len(vals) < 2:
+                  continue
+              ts, lines = vals[0], vals[1]
+              for t, l in zip(ts, lines):
+                  try:
+                      when = datetime.datetime.fromtimestamp(float(t) / 1000, datetime.timezone.utc).strftime("%m-%d %H:%M:%SZ")
+                  except Exception:
+                      when = str(t)
+                  print("  %s %s" % (when, str(l)[:400]))
+                  n += 1
+          if n == 0:
+              print("  (no matching lines)")
+          '
+          done
+
+      - name: Recent raw logs (last 2 hours)
+        env:
+          GRAFANA_TOKEN: ${{ secrets.GRAFANA_SA_TOKEN }}
+          GRAFANA_URL: ${{ vars.GRAFANA_URL }}
+        run: |
+          set -euo pipefail
+          SELECTOR=$(python3 -c '
+          import json
+          d = json.load(open("ops/grafana/journey-dashboard.json"))
+          found = []
+          def walk(o):
+              if isinstance(o, dict):
+                  ds = o.get("datasource")
+                  if isinstance(ds, dict) and ds.get("type") == "loki" and isinstance(o.get("expr"), str):
+                      found.append(o["expr"])
+                  for v in o.values():
+                      walk(v)
+              elif isinstance(o, list):
+                  for v in o:
+                      walk(v)
+          walk(d)
+          print(found[0] if found else "")
+          ')
+          [ -n "$SELECTOR" ] || SELECTOR='{service_name=~".+"}'
+          FROM=$(( $(date -u +%s) - 7200 ))000
+          TO=$(date -u +%s)000
+          python3 - "$FROM" "$TO" "$SELECTOR" > /tmp/q.json <<'PY'
+          import json, sys
+          print(json.dumps({"queries": [{"refId": "A", "datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": sys.argv[3], "queryType": "range", "maxLines": 120}], "from": sys.argv[1], "to": sys.argv[2]}))
+          PY
+          echo "## Raw logs, last 2h (max 120 lines):"
+          curl -sS -w '\nHTTP_STATUS:%{http_code}\n' -H "Authorization: Bearer $GRAFANA_TOKEN" -H 'Content-Type: application/json' -d @/tmp/q.json "$GRAFANA_URL/api/ds/query" > /tmp/l.txt
+          tail -1 /tmp/l.txt
+          head -n -1 /tmp/l.txt | python3 -c '
+          import json, sys, datetime
+          raw = sys.stdin.read()
+          try:
+              d = json.loads(raw)
+          except Exception:
+              print("PARSE FAIL, raw head:", raw[:300]); sys.exit(0)
+          frames = (d.get("results", {}).get("A") or {}).get("frames", [])
+          n = 0
+          for f in frames:
+              vals = (f.get("data") or {}).get("values", [])
+              if not vals or len(vals) < 2:
+                  continue
+              ts, lines = vals[0], vals[1]
+              for t, l in zip(ts, lines):
+                  try:
+                      when = datetime.datetime.fromtimestamp(float(t) / 1000, datetime.timezone.utc).strftime("%m-%d %H:%M:%SZ")
+                  except Exception:
+                      when = str(t)
+                  print("  %s %s" % (when, str(l)[:300]))
+                  n += 1
+          if n == 0:
+              print("  (no lines)")
+          '
