@@ -1104,3 +1104,32 @@ QA 611,390 · reviewer 240,823 · KB-review agents 479,369 + 275,347 + 351,367 �
 **M6 execution on #68** — now the largest open work (the docs face carries 8 graded points): README per KB-08, evidence/pack/permissions docs, role-file frontmatter, one distilled skill, `.env.example`. Owner inputs queued: deadline confirmation, dashboard screenshots (filters visible), the two-session-ritual video on prod. Then M7 on #69. Follow-ups unchanged: #57 trace, #66 traceback, `DRILL_PROBE_5XX` hygiene on dev.
 
 **Addendum (same day): the deadline question is RESOLVED.** The owner confirmed on the course platform: submission deadline = **2026-10-26** (platform supersedes KB 01 p.13, whose slot dates are outdated). The plan's original date was correct all along; the Oct-25 EOD scope freeze stands. M6 today, M7 tomorrow.
+
+## 2026-10-25 — PROVIDER HANDOFF ENTRY (read me first: fresh session on a NEW LLM provider starts here)
+
+**Why this entry exists:** the z.ai provider degraded repeatedly on Oct 24–25 (network failures / server errors killing agent sessions mid-task, ~7 interruptions across two days). The owner must hand off not just the session but the provider itself. Everything a fresh orchestrator needs is in the repo (AGENTS.md → this entry); nothing relies on any provider's session memory. Verify-then-write: every claim below carries its checkable pointer.
+
+### Non-negotiable context
+
+- **Deadline: submission 2026-10-26** (owner-confirmed on the platform; recorded in #69 and `a3118a5`). Scope freeze **Oct 25 EOD** (plan §6). Milestones M0–M5 COMPLETE on the tracker; remaining: **M6 (#68, docs/demo) today, M7 (#69, submission) tomorrow**.
+- Process: graph loop per `_docs/process.md` §8 (PM brief = cycle source of truth; engineer → QA + reviewer; **the human merges**; attribution headers on every agent comment). Working defensively under provider instability is itself a recorded deviation — see Lessons.
+
+### State at handoff (2026-10-25 ~12:00Z) — all verified this morning
+
+1. **PR #70 (M6 PR-1, agent-pack docs) is READY FOR MERGE**: QA PASS (comment 6383452332), REVIEW: APPROVE (6395641728; the one [minor] fixed by `5e6f185` and re-verified), CI 6/6. Branch `feat/68-agent-pack-docs` (HEAD 5e6f185). Disclosure comments on the PR explain the orchestrator-opened-PR deviation (engineer authored all content; its sessions died post-commit). **Owner action: merge.** After merge: run the PR-2 cycle.
+2. **PR-2 (README rewrite + `.env.example`) NOT STARTED** — its full spec is the PM brief on #68 (comment 6382048768): branch `feat/68-readme-demo` from merged main, KB-08 16-section structure, demo placeholders (owner media pending), `Closes #68` only here. The brief is self-sufficient.
+3. **Owner inputs pending**: dashboard/alert screenshots (env+version filters visible), the demo video = course's two-session ritual on PROD (play → game over → submit "Luca" → leaderboard) — note: `window.__game` hooks are DEV-only, so on prod the game plays naturally; warm the service first (first request after idle takes ~43 s, measured). Owner reviews PR #70 meanwhile.
+4. **Alert "firing since Oct 24 ~19:00 CEST" — ROOT CAUSE FOUND, not new 5xx**: a **NoData alert instance active since 15:13Z Oct 24** is emailing (`ccr-owner-email`); the committed rule says `noDataState: OK` but the live rule evidently doesn't carry it. Full evidence + actions: the consolidated comment on #66 (6397537178). **Mitigation = re-run the `grafana-apply` workflow (workflow_dispatch, no inputs, idempotent) — then verify the instance goes Normal.** Read-only diagnose tool committed on scratch branch `ops/grafana-diagnose` (do not merge; iterate or delete after use; its parser has 2 known bugs listed in the #66 comment).
+5. **#66 (real defect) stays post-submission**: transient first-DB-request 500s after idle; fix candidate `pool_pre_ping` on `create_engine` (`backend/app/database.py:42`); the Oct-25 canary measured ~43 s first-response wake on both envs, paths healthy when warm (201s read-back).
+6. Health-monitor red runs (Oct-24 05:40/09:39/20:38Z, Oct-25 09:39/11:13Z) = timeout class vs the ~43 s cold start; runbook already prescribes the 3×10s→30s tuning; one-line workflow change when convenient.
+7. Services healthy at handoff (dev+prod 200); last deploy on main: `a3118a5`. Branches: `main` clean; `feat/68-agent-pack-docs` (PR #70); `ops/grafana-diagnose` (scratch tool). Play worktree `../ccr-play` (owner's, untouched).
+
+### Critical path to submission (nothing else matters first)
+
+TODAY (Oct 25): owner merges #70 → PR-2 cycle (engineer → QA/reviewer → merge) → owner fills demo media → diary cycle entry → EOD freeze. TOMORROW (Oct 26, M7/#69): agent drafts `docs/self-assessment.md` (12 criteria, evidence-linked) → owner approves → final digest-gated promotion (brings prod to final main) → D11 flip public + pin SHA + logged-out check → owner submits on the platform → 3 peer reviews. Non-blocking: #66/#57/DRILL_PROBE_5XX hygiene stay open into the improvement window.
+
+### Lessons (Oct 24–25, provider degradation)
+
+- **Defensive mode worked**: small commits after every unit of work (the engineer's 6 commits survived two session deaths untouched); mechanical completion by the orchestrator with mandatory disclosure in the PR body; narrow-rescope subagents; verify-then-write against primary sources before ANY plan. Work-in-files, not-in-agent-memory proved the durable substrate — again (first proven in cycle #22).
+- **The alert layer produced a false "continuous firing" via NoData emailing** — an alerting-semantics gap (noDataState not surviving to live), caught only by interrogating Grafana directly through the existing secrets path (diagnose workflow via `GRAFANA_SA_TOKEN`). The investigation itself doubles as on-call evidence: user-impact report → hypothesis → primary-source verification → smallest-action prescription.
+- **Shell heredocs bit once** (unquoted `<<EOF` executed backticks in a PR body — fixed by body-files; lesson: always `<<'EOF'` or Write-tool files for GitHub bodies). YAML plain-scalar colons and inline-python indentation also cost two diagnose iterations — pre-validate locally (ruby YAML, bash -n, ast.parse) before pushing workflows; that check turned iteration 4+ green first try.
