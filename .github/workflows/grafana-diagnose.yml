@@ -6,6 +6,8 @@ name: Grafana diagnose (read-only)
 # Scratch-branch tool (ops/grafana-diagnose); not intended to merge.
 
 on:
+  push:
+    branches: [ops/grafana-diagnose]
   workflow_dispatch:
     inputs:
       hours_back:
