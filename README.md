@@ -8,14 +8,15 @@ Clown Circus Reloaded is a browser remake of the 1970s arcade classics *Circus* 
 - **Production:** https://clown-circus-reloaded-prod.onrender.com
 - **Development:** https://clown-circus-reloaded.onrender.com
 
-*Demo media pending owner capture (tracked for M6 close) — live app: https://clown-circus-reloaded-prod.onrender.com · https://clown-circus-reloaded.onrender.com*
+*Demo media pending owner capture (tracked for M7) — live app: https://clown-circus-reloaded.onrender.com · https://clown-circus-reloaded-prod.onrender.com*
 
 <!-- Demo media checklist (owner capture, then replace the placeholder above):
      1. ccr-journey dashboard screenshot WITH the environment + deployed-version filter dropdowns visible
      2. Alert rule screenshots: Firing state + Alerting History (the #59 fire-and-clear evidence)
      3. Leaderboard screenshots: dev and prod, entries visible
      4. Gameplay screenshot (mid-game, HUD visible)
-     5. Short video (~30 s) of the verification ritual on PROD: play → game over → submit name → entry visible on the leaderboard -->
+     5. Short video (~30 s) of the verification ritual on PROD: play → game over → submit name → entry visible on the leaderboard
+     6. ccr-env-version dashboard screenshot (every deploy as a service_version line) -->
 
 ## Problem
 
@@ -50,7 +51,7 @@ The application emits OpenTelemetry signals (metrics, traces, structured logs sh
 - **`ccr-journey`** — the key user journey: per-endpoint request **rate**, **duration (p95)**, and **error rate** for `POST /scores` and `GET /leaderboard`, each grouped by environment (dev/prod); plus log and trace panels where every log line links to its trace (and every trace exemplar links back to logs) via trace-ID correlation. What the panels tell you: whether score saves and leaderboard reads are fast and succeeding, separately per environment — the exact user-impact surface.
 - **`ccr-env-version`** — every deploy appears as a new `service_version` line: request rate per version, so a regression can be pinned to the exact deploy that introduced it.
 
-Viewing them requires the project's Grafana Cloud account (observability services stay authenticated — nothing is exposed publicly); the Demo section above carries screenshots of both, and a 5xx **alert** (`ccr-5xx-user-impact`) emails on sustained server errors per environment — fired and resolved on real traffic during the M5 drill, with the full record in [`docs/agent-work-evidence.md`](docs/agent-work-evidence.md) and [`_docs/diary.md`](_docs/diary.md).
+Viewing them requires the project's Grafana Cloud account (observability services stay authenticated — nothing is exposed publicly); the Demo section above will carry screenshots of both dashboards, and a 5xx **alert** (`ccr-5xx-user-impact`) emails on sustained server errors per environment — fired and resolved on real traffic during the M5 drill (diagnosed end-to-end by an **AI on-call agent** paged with the alert text only, its smallest-fix PR human-reviewed), with the full record in [`docs/agent-work-evidence.md`](docs/agent-work-evidence.md) and [`_docs/diary.md`](_docs/diary.md).
 
 ## Quickstart
 
@@ -143,7 +144,7 @@ The build itself followed the course's incremental arc — specification → fro
 
 Named boundaries, with their practical consequences:
 
-- **Free-tier cold start**: after ~15 idle minutes the services sleep; the first request takes up to ~45 s (measured). The scheduled health monitor keeps them mostly warm; the leaderboard UI falls back to its cached copy while waking.
+- **Free-tier cold start**: after ~15 idle minutes the services sleep; the first request takes up to ~45 s (measured: 43 s). The scheduled health monitor keeps them mostly warm; the leaderboard UI falls back to its cached copy while waking.
 - **Transient first-write failures after idle** (issue [#66](https://github.com/lucapug/clown-circus-reloaded/issues/66)): a score save immediately after wake can 500 once; the client's offline queue holds the score and syncs it — the player never loses a save. Fix candidate identified (connection-pool pre-ping); deliberately deferred past the submission freeze.
 - **A stranded-clown edge case** (issue [#57](https://github.com/lucapug/clown-circus-reloaded/issues/57)): a board clown can stop at vx≈0 (no slide, no fall) until the next launch; the game stays playable. Awaiting a recorder trace from the owner; fix-vs-version-2 is an open call.
 - **Desktop only**: mouse + click/SPACE; no touch support. **E2E hooks are dev-only** (proven absent from production builds by `npm run test:prod-gating`).
