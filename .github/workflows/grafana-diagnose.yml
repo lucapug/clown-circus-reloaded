@@ -24,116 +24,127 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Context
-        run: date -u +"run_at %Y-%m-%dT%H:%M:%SZ"
+      - name: Parser setup
+        run: |
+          cat > /tmp/fmt.py <<'PY'
+          import datetime
+          import json
+          import sys
+
+          kind = sys.argv[1] if len(sys.argv) > 1 else "raw"
+          raw = sys.stdin.read()
+          try:
+              d = json.loads(raw)
+          except Exception:
+              print("PARSE FAIL, raw head:", raw[:400])
+              sys.exit(0)
+
+          def ts(t):
+              try:
+                  return datetime.datetime.fromtimestamp(float(t) / 1000, datetime.timezone.utc).strftime("%m-%d %H:%M:%SZ")
+              except Exception:
+                  return str(t)
+
+          if kind == "prom":
+              frames = (d.get("results", {}).get("A") or {}).get("frames", [])
+              printed = False
+              for f in frames:
+                  labels = f.get("schema", {}).get("labels") or {}
+                  vals = (f.get("data") or {}).get("values", [])
+                  if not vals or len(vals) < 2:
+                      continue
+                  hits = [(ts(t), v) for t, v in zip(vals[0], vals[1]) if v and v > 0]
+                  if hits:
+                      printed = True
+                      print("--- %s %s: %d non-zero 15m-windows" % (labels.get("deployment_environment_name", "?"), labels.get("http_route", "?"), len(hits)))
+                      print("    " + ", ".join("%s=%g" % h for h in hits))
+              if not printed:
+                  print("(all series zero in window)")
+          elif kind == "rules":
+              data = d.get("data", d)
+              for g in (data.get("groups") or []):
+                  for r in (g.get("rules") or []):
+                      print(r.get("state"), "|", r.get("name"), "| health:", r.get("health"))
+                      for a in (r.get("alerts") or []):
+                          print("   instance:", a.get("state"), "| activeAt:", a.get("activeAt"), "| labels:", a.get("labels"))
+          elif kind == "alerts":
+              alerts = (d.get("data") or {}).get("alerts") or []
+              if not alerts:
+                  print("(no active instances)")
+              for a in alerts:
+                  print(a.get("state"), "|", (a.get("labels") or {}).get("alertname"), "| activeAt:", a.get("activeAt"))
+          elif kind == "loki":
+              frames = (d.get("results", {}).get("A") or {}).get("frames", [])
+              n = 0
+              for f in frames:
+                  vals = (f.get("data") or {}).get("values", [])
+                  if not vals or len(vals) < 2:
+                      continue
+                  for t, l in zip(vals[0], vals[1]):
+                      print("  %s %s" % (ts(t), str(l)[:400]))
+                      n += 1
+              if n == 0:
+                  print("  (no lines)")
+          elif kind == "selector":
+              d2 = json.load(open("ops/grafana/journey-dashboard.json"))
+              found = []
+              def walk(o):
+                  if isinstance(o, dict):
+                      ds = o.get("datasource")
+                      if isinstance(ds, dict) and ds.get("type") == "loki" and isinstance(o.get("expr"), str):
+                          found.append(o["expr"])
+                      for v in o.values():
+                          walk(v)
+                  elif isinstance(o, list):
+                      for v in o:
+                          walk(v)
+              walk(d2)
+              print(found[0] if found else "")
+          elif kind == "lokiquery":
+              print(json.dumps({"queries": [{"refId": "A", "datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": sys.argv[3], "queryType": "range", "maxLines": 80}], "from": sys.argv[1], "to": sys.argv[2]}))
+          else:
+              print(json.dumps(d)[:600])
+          PY
+          python3 /tmp/fmt.py selector < /dev/null
+          date -u +"run_at %Y-%m-%dT%H:%M:%SZ"
 
       - name: 5xx requests by env and route (range)
         env:
           GRAFANA_TOKEN: ${{ secrets.GRAFANA_SA_TOKEN }}
           GRAFANA_URL: ${{ vars.GRAFANA_URL }}
         run: |
-          set -euo pipefail
           H="${{ inputs.hours_back }}"
+          H="${H:-32}"
           FROM=$(( $(date -u +%s) - H * 3600 ))000
           TO=$(date -u +%s)000
           printf '{"queries":[{"refId":"A","datasource":{"type":"prometheus","uid":"grafanacloud-prom"},"expr":"sum by (deployment_environment_name, http_route) (increase(http_server_request_duration_seconds_count{http_response_status_code=~\\"5..\\"}[15m]))","queryType":"range","intervalMs":300000,"maxDataPoints":600}],"from":"%s","to":"%s"}' "$FROM" "$TO" > /tmp/q.json
           echo "## 5xx increase[15m] by env/route, last ${H}h — non-zero points only:"
           curl -sS -w '\nHTTP_STATUS:%{http_code}\n' -H "Authorization: Bearer $GRAFANA_TOKEN" -H 'Content-Type: application/json' -d @/tmp/q.json "$GRAFANA_URL/api/ds/query" > /tmp/r.txt
           tail -1 /tmp/r.txt
-          head -n -1 /tmp/r.txt | python3 -c '
-          import json, sys, datetime
-          raw = sys.stdin.read()
-          try:
-              d = json.loads(raw)
-          except Exception:
-              print("PARSE FAIL, raw head:", raw[:400]); sys.exit(0)
-          frames = (d.get("results", {}).get("A") or {}).get("frames", [])
-          if not frames:
-              print("(no frames)", json.dumps(d)[:400]); sys.exit(0)
-          printed = False
-          for f in frames:
-              labels = f.get("schema", {}).get("labels") or {}
-              vals = (f.get("data") or {}).get("values", [])
-              if not vals or len(vals) < 2:
-                  continue
-              ts, series = vals[0], vals[1]
-              hits = []
-              for t, v in zip(ts, series):
-                  if v and v > 0:
-                      try:
-                          when = datetime.datetime.fromtimestamp(float(t) / 1000, datetime.timezone.utc).strftime("%m-%d %H:%M")
-                      except Exception:
-                          when = str(t)
-                      hits.append((when, v))
-              if hits:
-                  printed = True
-                  env = labels.get("deployment_environment_name", "?")
-                  route = labels.get("http_route", "?")
-                  print("--- %s %s: %d non-zero 15m-windows" % (env, route, len(hits)))
-                  print("    " + ", ".join("%s=%g" % (w, v) for w, v in hits))
-          if not printed:
-              print("(all series zero in the window)")
-          '
+          head -n -1 /tmp/r.txt | python3 /tmp/fmt.py prom
 
       - name: Alert rule state and active instances
         env:
           GRAFANA_TOKEN: ${{ secrets.GRAFANA_SA_TOKEN }}
           GRAFANA_URL: ${{ vars.GRAFANA_URL }}
         run: |
-          set -euo pipefail
-          for EP in rules alerts; do
-            echo "## /api/prometheus/grafana/api/v1/$EP:"
-            curl -sS -w '\nHTTP_STATUS:%{http_code}\n' -H "Authorization: Bearer $GRAFANA_TOKEN" \
-              "$GRAFANA_URL/api/prometheus/grafana/api/v1/$EP" > /tmp/a.txt
-            tail -1 /tmp/a.txt
-            head -n -1 /tmp/a.txt | python3 -c '
-            import json, sys
-            raw = sys.stdin.read()
-            try:
-                d = json.loads(raw)
-            except Exception:
-                print("PARSE FAIL, raw head:", raw[:400]); sys.exit(0)
-            data = d.get("data", d)
-            if isinstance(data, dict) and "groups" in data:
-                for g in data.get("groups", []):
-                    for r in g.get("rules", []):
-                        print(r.get("state"), "|", r.get("name"), "| health:", r.get("health"))
-                        for a in r.get("alerts", []):
-                            print("   instance:", a.get("state"), "| activeAt:", a.get("activeAt"), "| labels:", a.get("labels"))
-            elif isinstance(data, dict) and "alerts" in data:
-                alerts = data.get("alerts", [])
-                if not alerts:
-                    print("(no active instances)")
-                for a in alerts:
-                    print(a.get("state"), "|", (a.get("labels") or {}).get("alertname"), "| activeAt:", a.get("activeAt"))
-            else:
-                print(json.dumps(d)[:600])
-            '
-          done
+          echo "## /api/prometheus/grafana/api/v1/rules:"
+          curl -sS -w '\nHTTP_STATUS:%{http_code}\n' -H "Authorization: Bearer $GRAFANA_TOKEN" \
+            "$GRAFANA_URL/api/prometheus/grafana/api/v1/rules" > /tmp/a.txt
+          tail -1 /tmp/a.txt
+          head -n -1 /tmp/a.txt | python3 /tmp/fmt.py rules
+          echo "## /api/prometheus/grafana/api/v1/alerts:"
+          curl -sS -w '\nHTTP_STATUS:%{http_code}\n' -H "Authorization: Bearer $GRAFANA_TOKEN" \
+            "$GRAFANA_URL/api/prometheus/grafana/api/v1/alerts" > /tmp/b.txt
+          tail -1 /tmp/b.txt
+          head -n -1 /tmp/b.txt | python3 /tmp/fmt.py alerts
 
       - name: Error logs at the known windows (Loki)
         env:
           GRAFANA_TOKEN: ${{ secrets.GRAFANA_SA_TOKEN }}
           GRAFANA_URL: ${{ vars.GRAFANA_URL }}
         run: |
-          set -euo pipefail
-          SELECTOR=$(python3 -c '
-          import json
-          d = json.load(open("ops/grafana/journey-dashboard.json"))
-          found = []
-          def walk(o):
-              if isinstance(o, dict):
-                  ds = o.get("datasource")
-                  if isinstance(ds, dict) and ds.get("type") == "loki" and isinstance(o.get("expr"), str):
-                      found.append(o["expr"])
-                  for v in o.values():
-                      walk(v)
-              elif isinstance(o, list):
-                  for v in o:
-                      walk(v)
-          walk(d)
-          print(found[0] if found else "")
-          ')
+          SELECTOR=$(python3 /tmp/fmt.py selector < /dev/null)
           if [ -z "$SELECTOR" ]; then SELECTOR='{service_name=~".+"}'; echo "(selector not found — using catch-all)"; fi
           echo "## Loki selector (from the committed journey dashboard): $SELECTOR"
           EXPR_ERR="$SELECTOR |~ \"(?i)error|traceback|exception\""
@@ -151,37 +162,11 @@ jobs:
             LABEL=$(echo "$W" | cut -d" " -f3)
             FROM=$(date -u -d "$S" +%s)000
             TO=$(date -u -d "$E" +%s)000
-            python3 - "$FROM" "$TO" "$EXPR_ERR" > /tmp/q.json <<'PY'
-          import json, sys
-          print(json.dumps({"queries": [{"refId": "A", "datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": sys.argv[3], "queryType": "range", "maxLines": 80}], "from": sys.argv[1], "to": sys.argv[2]}))
-          PY
+            python3 /tmp/fmt.py lokiquery "$FROM" "$TO" "$EXPR_ERR" < /dev/null > /tmp/q.json
             echo "### Window $S -> $E ($LABEL):"
             curl -sS -w '\nHTTP_STATUS:%{http_code}\n' -H "Authorization: Bearer $GRAFANA_TOKEN" -H 'Content-Type: application/json' -d @/tmp/q.json "$GRAFANA_URL/api/ds/query" > /tmp/l.txt
             tail -1 /tmp/l.txt
-            head -n -1 /tmp/l.txt | python3 -c '
-          import json, sys, datetime
-          raw = sys.stdin.read()
-          try:
-              d = json.loads(raw)
-          except Exception:
-              print("PARSE FAIL, raw head:", raw[:300]); sys.exit(0)
-          frames = (d.get("results", {}).get("A") or {}).get("frames", [])
-          n = 0
-          for f in frames:
-              vals = (f.get("data") or {}).get("values", [])
-              if not vals or len(vals) < 2:
-                  continue
-              ts, lines = vals[0], vals[1]
-              for t, l in zip(ts, lines):
-                  try:
-                      when = datetime.datetime.fromtimestamp(float(t) / 1000, datetime.timezone.utc).strftime("%m-%d %H:%M:%SZ")
-                  except Exception:
-                      when = str(t)
-                  print("  %s %s" % (when, str(l)[:400]))
-                  n += 1
-          if n == 0:
-              print("  (no matching lines)")
-          '
+            head -n -1 /tmp/l.txt | python3 /tmp/fmt.py loki
           done
 
       - name: Recent raw logs (last 2 hours)
@@ -189,55 +174,12 @@ jobs:
           GRAFANA_TOKEN: ${{ secrets.GRAFANA_SA_TOKEN }}
           GRAFANA_URL: ${{ vars.GRAFANA_URL }}
         run: |
-          set -euo pipefail
-          SELECTOR=$(python3 -c '
-          import json
-          d = json.load(open("ops/grafana/journey-dashboard.json"))
-          found = []
-          def walk(o):
-              if isinstance(o, dict):
-                  ds = o.get("datasource")
-                  if isinstance(ds, dict) and ds.get("type") == "loki" and isinstance(o.get("expr"), str):
-                      found.append(o["expr"])
-                  for v in o.values():
-                      walk(v)
-              elif isinstance(o, list):
-                  for v in o:
-                      walk(v)
-          walk(d)
-          print(found[0] if found else "")
-          ')
+          SELECTOR=$(python3 /tmp/fmt.py selector < /dev/null)
           [ -n "$SELECTOR" ] || SELECTOR='{service_name=~".+"}'
           FROM=$(( $(date -u +%s) - 7200 ))000
           TO=$(date -u +%s)000
-          python3 - "$FROM" "$TO" "$SELECTOR" > /tmp/q.json <<'PY'
-          import json, sys
-          print(json.dumps({"queries": [{"refId": "A", "datasource": {"type": "loki", "uid": "grafanacloud-logs"}, "expr": sys.argv[3], "queryType": "range", "maxLines": 120}], "from": sys.argv[1], "to": sys.argv[2]}))
-          PY
+          python3 /tmp/fmt.py lokiquery "$FROM" "$TO" "$SELECTOR" < /dev/null > /tmp/q.json
           echo "## Raw logs, last 2h (max 120 lines):"
           curl -sS -w '\nHTTP_STATUS:%{http_code}\n' -H "Authorization: Bearer $GRAFANA_TOKEN" -H 'Content-Type: application/json' -d @/tmp/q.json "$GRAFANA_URL/api/ds/query" > /tmp/l.txt
           tail -1 /tmp/l.txt
-          head -n -1 /tmp/l.txt | python3 -c '
-          import json, sys, datetime
-          raw = sys.stdin.read()
-          try:
-              d = json.loads(raw)
-          except Exception:
-              print("PARSE FAIL, raw head:", raw[:300]); sys.exit(0)
-          frames = (d.get("results", {}).get("A") or {}).get("frames", [])
-          n = 0
-          for f in frames:
-              vals = (f.get("data") or {}).get("values", [])
-              if not vals or len(vals) < 2:
-                  continue
-              ts, lines = vals[0], vals[1]
-              for t, l in zip(ts, lines):
-                  try:
-                      when = datetime.datetime.fromtimestamp(float(t) / 1000, datetime.timezone.utc).strftime("%m-%d %H:%M:%SZ")
-                  except Exception:
-                      when = str(t)
-                  print("  %s %s" % (when, str(l)[:300]))
-                  n += 1
-          if n == 0:
-              print("  (no lines)")
-          '
+          head -n -1 /tmp/l.txt | python3 /tmp/fmt.py loki
