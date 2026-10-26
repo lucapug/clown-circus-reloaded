@@ -1187,3 +1187,5 @@ The owner submits on the course platform and completes the **3 mandatory peer re
 ### The project, honestly, at submission
 
 M0–M7 executed on the agreed plan; 12/12 rubric criteria carried by verifiable evidence (self-assessment, believed 24/24 with the candor section); the tracker tells the truth (3 issues open BY CHOICE, all documented); the diary records every deviation including two days of provider degradation survived by work-in-files. The 2025 game, rebuilt by a 2026 agent team.
+
+**Learn-in-public addendum (2026-10-26):** the post is live — https://lnkd.in/p/da2a-8Wt (gameplay.png as the visual; the "same game, very different human role" story) — and the owner registered the link with the course submission within the same-day window. Remaining after submission: the 3 mandatory peer reviews close #69; then the improvement window (#66, #57, hygiene).
