@@ -1133,3 +1133,36 @@ TODAY (Oct 25): owner merges #70 → PR-2 cycle (engineer → QA/reviewer → me
 - **Defensive mode worked**: small commits after every unit of work (the engineer's 6 commits survived two session deaths untouched); mechanical completion by the orchestrator with mandatory disclosure in the PR body; narrow-rescope subagents; verify-then-write against primary sources before ANY plan. Work-in-files, not-in-agent-memory proved the durable substrate — again (first proven in cycle #22).
 - **The alert layer produced a false "continuous firing" via NoData emailing** — an alerting-semantics gap (noDataState not surviving to live), caught only by interrogating Grafana directly through the existing secrets path (diagnose workflow via `GRAFANA_SA_TOKEN`). The investigation itself doubles as on-call evidence: user-impact report → hypothesis → primary-source verification → smallest-action prescription.
 - **Shell heredocs bit once** (unquoted `<<EOF` executed backticks in a PR body — fixed by body-files; lesson: always `<<'EOF'` or Write-tool files for GitHub bodies). YAML plain-scalar colons and inline-python indentation also cost two diagnose iterations — pre-validate locally (ruby YAML, bash -n, ast.parse) before pushing workflows; that check turned iteration 4+ green first try.
+
+## 2026-10-24 → 26 — Cycle #33 (issue #68, PRs #70–#71): M6 under provider fire — and the NoData alert saga
+
+### What and why
+
+The M6 docs/demo cycle, executed across three calendar days because the z.ai provider degraded repeatedly (network/server errors killing sessions mid-task — 7+ interruptions; recorded deviations below). Two PRs per the PM brief (comment 6382048768): PR-1 agent-pack docs, PR-2 README + `.env.example`.
+
+### PR #70 (agent-pack, MERGED Oct 25 13:03Z by the owner)
+
+Six engineer-authored commits (runbook C2+AC2 fixes, evidence extension with the #60 reconstructable timeline, permissions.md on the KB-02 Rules skeleton, agent-extension-pack.md on the four pillars, role-file frontmatter ×4, prod-promotion SKILL.md). The engineer session died TWICE after committing (provider) — work-in-files survived both deaths untouched; the orchestrator completed the mechanical remainder (push + PR) with full disclosure in the PR body. Verdicts: [QA PASS](https://github.com/lucapug/clown-circus-reloaded/pull/70#issuecomment-6383452332) (40+ checks; 12+ live permalink spot-checks; npm test observed 252|6+49); reviewer REQUEST_CHANGES with one [minor] (the #41 chain's FAIL link pointed at the amended PASS comment) → fixed by orchestrator mini-rework `5e6f185` → [REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/70#issuecomment-6395641728) after a narrow re-verify.
+
+### PR #71 (README + .env.example, MERGED Oct 26 by the owner → **#68 CLOSED, M6 COMPLETE on the tracker**)
+
+The engineer delivered the two `.env.example` files (0d8448c — which also needed one `.gitignore` line, `!.env.example`, surfaced by QA) then died twice more; the README rewrite was authored by the orchestrator under the recorded deviation (commit `44ab8e2`), structured on KB-08's four reader questions. Verdicts: [QA PASS](https://github.com/lucapug/clown-circus-reloaded/pull/71#issuecomment-6399024860) (41 checks; every factual claim traced to source; KB-08 mistakes checklist 8/8); reviewer REQUEST_CHANGES with three one-line [minor]s (future tense on pending demo media + missing env-version checklist item; the missing on-call beat in the ops story; placeholder wording vs the brief template) → mechanical rework `172d90c` → [REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/71#issuecomment-6399946315). CI 6/6 on every commit. Post-merge (owner request): a three-line **provenance note** before Problem (`d6555b2`) — the deliberate 2025-reimplementation framing, condensed from the old README so the brownfield intent is explicit for reviewers.
+
+### The alert saga (Oct 24–25): "continuous firing" was NoData emailing, not 5xx
+
+The owner reported continuous alert emails from Oct 24 ~19:00 CEST with no traffic of his on Render (his play sessions turned out to hit dev — the "Luc" leaderboard entries). Investigation through a read-only diagnose workflow on scratch branch `ops/grafana-diagnose` (built via `GRAFANA_SA_TOKEN` in GitHub secrets; 4 iterations, its own 2 parser bugs fixed en route — labels live in `schema.fields[].labels`; the dashboard's Loki selector carries the `$env` template variable): the 5xx series over 32h was **zero**; the alert rule carried an **active NoData instance since 15:13Z Oct 24** routed to the email receiver. The committed JSON says `noDataState: "OK"` — but the live rule was **hand-created in the UI** (the recorded provisioning-API-absent deviation from cycle #30) with no-data handling left at the default. The orchestrator's first prescription (re-run grafana-apply) was **wrong** — the dispatch failed 404 on the whole provisioning surface, re-proving the recorded deviation; corrected on #66. **Fix (owner, UI): "Alert state if no data" No Data → Normal → Grafana sent the resolved email; loop closed.** Full record: #66 comments 6397537178 + 6397693601 + 6398028904-class thread. The real #66 defect (transient first-write 500 after idle; ~43 s measured wake, Oct-25 canary on both envs, paths healthy when warm) remains post-submission with fix candidate `pool_pre_ping` (`backend/app/database.py:42`).
+
+### Measured ledger (cycle #33)
+
+PM 582,807 · engineer (PR-1, 2 surviving sessions) unmeasured-fraction of ≈1.2M · QA 841,949 + 500,800 · reviewer 628,880 + 683,470 + 309,371 (re-verify) · KB-review agents 1.11M (Oct 24) → **≈ 4.6M+ measurable** across the three days.
+
+### Lessons
+
+- **Provider degradation is a workflow design problem, not a fatality**: small commits after every unit, work-in-files, orchestrator mechanical completion with disclosure, narrow re-scoped resumes. Every interruption cost time; none cost work. The graph's verification layer (QA/reviewer) stayed intact regardless of authorship.
+- **A "firing" report needs the alert's no-data semantics checked first**: NoData instances can email continuously with zero real 5xx. The committed-as-code rule and the live rule diverged silently — the provisioning-API-absent deviation was the root of THAT divergence (UI creation doesn't inherit the JSON). Recorded: when config is applied by hand, verify the hand-applied fields against the source of truth.
+- **Prescriptions need the same primary-source discipline as code**: the wrong re-apply recommendation cost one dispatch; the diary's own deviation record was the corrective.
+- The diagnose-workflow pattern (read-only API queries via existing secrets, on a scratch branch) is a keeper for post-submission ops.
+
+### Next
+
+**M7 today (Oct 26, submission by EOD)**: self-assessment draft (12 criteria, evidence-linked) → owner approval → final digest-gated promotion (prod to final main incl. d6555b2) → D11 flip public + pinned SHA + logged-out check → platform submission → 3 peer reviews. Owner media (6 screenshots + video per the README checklist) slot into `docs/demo/` — the one M6 remnant, tracked for M7. Follow-ups unchanged: #66 pool fix, #57 trace, `DRILL_PROBE_5XX` env hygiene, scratch-branch cleanup.
