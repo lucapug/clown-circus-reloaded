@@ -1166,3 +1166,24 @@ PM 582,807 · engineer (PR-1, 2 surviving sessions) unmeasured-fraction of ≈1.
 ### Next
 
 **M7 today (Oct 26, submission by EOD)**: self-assessment draft (12 criteria, evidence-linked) → owner approval → final digest-gated promotion (prod to final main incl. d6555b2) → D11 flip public + pinned SHA + logged-out check → platform submission → 3 peer reviews. Owner media (6 screenshots + video per the README checklist) slot into `docs/demo/` — the one M6 remnant, tracked for M7. Follow-ups unchanged: #66 pool fix, #57 trace, `DRILL_PROBE_5XX` env hygiene, scratch-branch cleanup.
+
+## 2026-10-26 — M7: SUBMISSION DAY — the flip is done, the pin is set
+
+### The final sequence (all verified, primary sources)
+
+- **Self-assessment** approved and merged (PR #72, `adc2447`) — the owner's merge IS the approval per #69's AC.
+- **Demo media** merged (PR #73, `88d7593`): the production verification-ritual video, the gameplay frame (checklist complete — the earlier deviation resolved in-PR with the disclosure comment), six captioned screenshots; the README Demo section is final.
+- **Final promotion** (owner-dispatched per the enforcement point, run [40303348895](https://github.com/lucapug/clown-circus-reloaded/actions/runs/40303348895)): digest gate matched BEFORE any Render call (`20261026-094842-88d7593` = `sha256:50c1e679…71c0`); prod `/health` exact-body verified; functional write+read verified (POST 201 + GET 200 — with the owner's morning "Luc" entries atop the prod leaderboard: the video's evidence, live).
+- **D11 flip** (owner, 2026-10-26): repository → **public**. Logged-out verification (unauthenticated curl): repo API `private: false`; README, issues, agent-work-evidence, self-assessment, permissions, extension-pack, the demo video, ops runbook, product-spec — all HTTP 200 anonymously.
+
+### 📌 The submission pin
+
+**`88d7593f6d84472484b976debeaa622359c06535`** (`main` at flip; CI green; the exact image prod serves by digest). Submission links: repo `https://github.com/lucapug/clown-circus-reloaded` · prod `https://clown-circus-reloaded-prod.onrender.com` · self-assessment `docs/self-assessment.md`.
+
+### What remains (post-flip)
+
+The owner submits on the course platform and completes the **3 mandatory peer reviews** (#69's last AC — the issue closes with them). Improvement window (second attempt): #66 `pool_pre_ping` fix (today's owner repro on prod — the offline queue working as designed — is the sharpest evidence yet), #57 recorder trace + fix-vs-v2, `DRILL_PROBE_5XX` env hygiene on dev, scratch-branch cleanup, and the owner's LinkedIn post (`docs/demo/gameplay.png` as the visual, the method-not-the-game as the story).
+
+### The project, honestly, at submission
+
+M0–M7 executed on the agreed plan; 12/12 rubric criteria carried by verifiable evidence (self-assessment, believed 24/24 with the candor section); the tracker tells the truth (3 issues open BY CHOICE, all documented); the diary records every deviation including two days of provider degradation survived by work-in-files. The 2025 game, rebuilt by a 2026 agent team.
