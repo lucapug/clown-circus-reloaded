@@ -176,7 +176,6 @@ From the recorded WONT-v1 list (second-attempt candidates, prioritized): the #66
 ## Self-evaluation
 
 A criterion-by-criterion self-assessment against the course rubric (score + evidence link per criterion) is at [`docs/self-assessment.md`](docs/self-assessment.md).
-<!-- TODO(owner, M7 #69): verify link resolves before D11 flip -->
 
 ## Documentation map
 
