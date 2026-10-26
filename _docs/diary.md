@@ -1217,3 +1217,32 @@ Verify-then-write against primary sources; work-in-files beats work-in-memory (s
 **Decisions:** (1) tag the pin, not HEAD — truth over convenience; (2) no manifest version bumps (`package.json` 0.1.0/0.0.0, `backend/pyproject.toml` 0.1.0): the image tags are date+sha, nothing in CI/CD reads those fields, and a bump would churn both lockfiles for a cosmetic value — revisit only if the project ever publishes packages; (3) post-submission fixes land on `main` after the tag; the next tag (v1.0.1 or v1.1.0) is decided when there is something worth releasing.
 
 **Next:** cycle #34 — issue #66 (`pool_pre_ping`), through the full graph (PM → engineer → QA ∥ reviewer, human merges). #57 stays parked until the owner's recorder trace exists. #69 waits for the three peer reviews (assignments expected from Oct 27, once submission closes).
+
+## 2026-10-26 (late) — Cycle #34 (issue #66, PR #74): the first post-submission fix — pool pre-ping
+
+### What and why
+
+The improvement window opens on the sharpest open defect: `#66`, the transient `500` on the first DB-touching request after idle (Neon auto-suspends after ~5 min; the pooled connection goes stale during gameplay; the game-over `POST /scores` hits it first — the owner's prod repro of this morning: 1st game saves online, 2nd+ games fall to the "saved locally" queue, synced on reload). The issue offered three options (bounded retry / lifespan warm-up / accept); **the reproduced mechanism chose the fix**: warm-up covers only container start (the repro is mid-session), retry covers only the write path — `pool_pre_ping=True` on the non-SQLite `create_engine` tests every pooled connection at checkout and reconnects transparently, for every route. Ratified pre-cycle, with the traceback AC declared satisfied-by-reproduction (never retrieved; three independent repros on record) — so the PM had no scope to invent.
+
+Full graph (process.md §8), no shortcuts for a one-line fix: PM brief ([comment](https://github.com/lucapug/clown-circus-reloaded/issues/66#issuecomment-6421476668), verified live against the venv: SQLAlchemy 2.1.5, lazy construction, `engine.pool._pre_ping`) → engineer ([PR #74](https://github.com/lucapug/clown-circus-reloaded/pull/74), 2 commits: the fix in its brief-mandated branch shape + the README Limitations rewording; new hermetic `backend/tests/test_database.py`, 2 tests, zero Postgres I/O) → QA ∥ reviewer, concurrent and independent.
+
+### Outcome and verdicts
+
+[QA PASS](https://github.com/lucapug/clown-circus-reloaded/pull/74#issuecomment-6421909522) — 7 DoD rows re-run: 51 passed (49 + 2), fix at `database.py:47` in the non-SQLite branch, diff = exactly the 3 allowed files, README line 166 byte-identical / 167 reworded, PR body honest. Row 7 (`npm run test:integration`, Postgres parity — the only check exercising pre-ping against a real pool) **BLOCKED: Docker daemon down on this machine**, pre-agreed in the brief, recorded as BLOCKED not inferred PASS. [REVIEW: APPROVE](https://github.com/lucapug/clown-circus-reloaded/pull/74#issuecomment-6421941474) — formed before reading QA (stated); zero blocker/major/minor; four notes, one to keep: the test pins SQLAlchemy **private** internals (`_pre_ping`, `_creator.__closure__`) — accepted for hermeticity, expect churn on upgrades. Zero rework passes. Orchestrator [close-out](https://github.com/lucapug/clown-circus-reloaded/issues/66#issuecomment-6421974998) posted, `in-progress` removed — **at the human-merge boundary; merge pending (owner)**.
+
+### Measured ledger (cycle #34)
+
+PM 297,886 (12 tools, 6.1 min) · engineer 549,266 (19, 3.7 min) · QA 338,987 (16, 3.4 min) · reviewer 273,718 (12, 4.5 min) → **≈ 1.46M** subagent tokens, 59 tool uses, ≈ 14 min wall-clock (QA ∥ reviewer). One failed PM dispatch (provider network error) before the retry — unmeasured. Against `_docs/graph-tuning.md` §4 targets: total ≤ 3.5M ✅ · engineer ≤ 2M ✅ · zero stalls ✅. Verdict-integrity checklist: QA full independent re-run ✅ · reviewer diff-only, formed before QA ✅ · no FAIL edge (none to route) · human merges ⏳.
+
+### Lessons
+
+- **A reproduced mechanism picks the fix; option lists written before the repro are hypotheses.** Ratifying the decision from the evidence trail (comments 1/4/7) before spawning the PM kept the brief decision-free and the cycle linear.
+- **Pre-agreeing the BLOCKED case costs one sentence and saves a false PASS.** Docker was down; the brief had already said row 7 may be BLOCKED; QA recorded exactly that. The real-pool proof is deferred, not faked — it runs with `npm run test:integration` once Docker is back.
+- **Hermetic tests of pool configuration buy speed with private-API coupling.** The alternative (a real Postgres in the unit suite) was rejected; the integration battery owns that proof. Named cost, recorded on the PR.
+- **Versioning truth (same session): tag the artifact, not the tip.** `v1.0.0` → `88d7593`, the digest-pinned submission commit; diary-only commits after it stay untagged.
+
+### Next
+
+1. **Owner merges #74** → `Closes #66` fires → CD builds the dev image. Then the **owner-approved prod promotion** (`.agents/skills/prod-promotion`, digest-gated) — and the live acceptance test is the repro itself: play two games on prod with a > 5-min pause between them; the second save should be `201` directly, no "saved locally" message. Candidate tag afterwards: `v1.0.1`.
+2. When Docker is available: `npm run test:integration` on `main` for the Postgres-parity proof of pre-ping (QA's deferred row 7).
+3. `#57` stays parked until the owner's recorder trace; `#69` waits for the three peer reviews (assignments expected from Oct 27). Hygiene unchanged: `DRILL_PROBE_5XX` env on dev, merged local branches.
