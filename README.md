@@ -8,15 +8,32 @@ Clown Circus Reloaded is a browser remake of the 1970s arcade classics *Circus* 
 - **Production:** https://clown-circus-reloaded-prod.onrender.com
 - **Development:** https://clown-circus-reloaded.onrender.com
 
-*Demo media pending owner capture (tracked for M7) — live app: https://clown-circus-reloaded.onrender.com · https://clown-circus-reloaded-prod.onrender.com*
+## Demo
 
-<!-- Demo media checklist (owner capture, then replace the placeholder above):
-     1. ccr-journey dashboard screenshot WITH the environment + deployed-version filter dropdowns visible
-     2. Alert rule screenshots: Firing state + Alerting History (the #59 fire-and-clear evidence)
-     3. Leaderboard screenshots: dev and prod, entries visible
-     4. Gameplay screenshot (mid-game, HUD visible)
-     5. Short video (~30 s) of the verification ritual on PROD: play → game over → submit name → entry visible on the leaderboard
-     6. ccr-env-version dashboard screenshot (every deploy as a service_version line) -->
+Play it: **[production](https://clown-circus-reloaded-prod.onrender.com)** · **[development](https://clown-circus-reloaded.onrender.com)** (free tier — the first request after a quiet period may take up to ~45 s to wake).
+
+**[Gameplay video (~35 s, shot on production)](docs/demo/demo-video.mp4)** — the course's two-session verification ritual in one take: play → game over → submit the name → the entry visible on the leaderboard.
+
+![Gameplay](docs/demo/gameplay.png)
+*Mid-game on production — clown in flight, HUD visible (score / lives / level). The near-parity 2025 gameplay, rebuilt.*
+
+![ccr-journey dashboard](docs/demo/journey-dashboard.png)
+*The `ccr-journey` dashboard in Grafana Cloud — per-endpoint request rate, duration (p95), and errors for the key user journey, grouped by environment (the environment filter dropdown is visible top-left).*
+
+![ccr-env-version dashboard](docs/demo/env-version-dashboard.png)
+*The `ccr-env-version` dashboard — every deploy appears as a new `service_version` line, so a regression can be pinned to the exact deploy.*
+
+![Alert firing](docs/demo/alert-firing.png)
+*The 5xx alert `ccr-5xx-user-impact` firing during the M5 on-call drill (dev) — sustained server errors on the user-impact write path.*
+
+![Alert history](docs/demo/alert-history.png)
+*The alert's state history — the fire-and-clear record on real traffic.*
+
+![Leaderboard on dev](docs/demo/leaderboard-dev.png)
+*The shared leaderboard on the development environment.*
+
+![Leaderboard on prod](docs/demo/leaderboard-prod.png)
+*The shared leaderboard on production — same game, separate database.*
 
 *A note on provenance: this project deliberately reimplements [Clown Circus Carnival](https://github.com/lucapug/clown-circus-carnival), my 2025 capstone for the course's first edition — same game, profoundly different method. The 2025 project manually orchestrated LLMs in assigned roles; this one is built with the AI-native engineering practices established over the past year (specifications, loops, graphs, subagents, CI/CD, observability — the 2026 edition's toolbox), applied and evaluated throughout the [project diary](_docs/diary.md).*
 
@@ -53,7 +70,7 @@ The application emits OpenTelemetry signals (metrics, traces, structured logs sh
 - **`ccr-journey`** — the key user journey: per-endpoint request **rate**, **duration (p95)**, and **error rate** for `POST /scores` and `GET /leaderboard`, each grouped by environment (dev/prod); plus log and trace panels where every log line links to its trace (and every trace exemplar links back to logs) via trace-ID correlation. What the panels tell you: whether score saves and leaderboard reads are fast and succeeding, separately per environment — the exact user-impact surface.
 - **`ccr-env-version`** — every deploy appears as a new `service_version` line: request rate per version, so a regression can be pinned to the exact deploy that introduced it.
 
-Viewing them requires the project's Grafana Cloud account (observability services stay authenticated — nothing is exposed publicly); the Demo section above will carry screenshots of both dashboards, and a 5xx **alert** (`ccr-5xx-user-impact`) emails on sustained server errors per environment — fired and resolved on real traffic during the M5 drill (diagnosed end-to-end by an **AI on-call agent** paged with the alert text only, its smallest-fix PR human-reviewed), with the full record in [`docs/agent-work-evidence.md`](docs/agent-work-evidence.md) and [`_docs/diary.md`](_docs/diary.md).
+Viewing them requires the project's Grafana Cloud account (observability services stay authenticated — nothing is exposed publicly); the Demo section above carries screenshots of both dashboards, and a 5xx **alert** (`ccr-5xx-user-impact`) emails on sustained server errors per environment — fired and resolved on real traffic during the M5 drill (diagnosed end-to-end by an **AI on-call agent** paged with the alert text only, its smallest-fix PR human-reviewed), with the full record in [`docs/agent-work-evidence.md`](docs/agent-work-evidence.md) and [`_docs/diary.md`](_docs/diary.md).
 
 ## Quickstart
 
