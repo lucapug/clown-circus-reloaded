@@ -1209,3 +1209,11 @@ M0–M7 executed on the agreed plan; 12/12 rubric criteria carried by verifiable
 ### Standing lessons (unchanged, still true)
 
 Verify-then-write against primary sources; work-in-files beats work-in-memory (survived ~a dozen provider failures across two days); small commits after every unit; the tracker is the truth (D2); handoff risk scales inversely with documentation — the repo just proved it again.
+
+## 2026-10-26 (late) — v1.0.0 tagged: the submission has a version
+
+**What and why:** the repository had no versioning; the owner asked to mark the capstone submission as **v1.0.0** before opening the improvement window. Annotated tag `v1.0.0` → `88d7593` (the submission pin, deliberately not `main`'s tip: the three later commits are diary-only, and `88d7593` is the commit the digest-gated prod image was built from — the tag names the artifact that was actually submitted). Published as a [GitHub Release](https://github.com/lucapug/clown-circus-reloaded/releases/tag/v1.0.0) carrying the pin, the promotion run, the prod URL, the self-assessment link, and the two open-by-choice limitations (#66, #57).
+
+**Decisions:** (1) tag the pin, not HEAD — truth over convenience; (2) no manifest version bumps (`package.json` 0.1.0/0.0.0, `backend/pyproject.toml` 0.1.0): the image tags are date+sha, nothing in CI/CD reads those fields, and a bump would churn both lockfiles for a cosmetic value — revisit only if the project ever publishes packages; (3) post-submission fixes land on `main` after the tag; the next tag (v1.0.1 or v1.1.0) is decided when there is something worth releasing.
+
+**Next:** cycle #34 — issue #66 (`pool_pre_ping`), through the full graph (PM → engineer → QA ∥ reviewer, human merges). #57 stays parked until the owner's recorder trace exists. #69 waits for the three peer reviews (assignments expected from Oct 27, once submission closes).
