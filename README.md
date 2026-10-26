@@ -53,7 +53,7 @@ From the repo root. Prerequisites: Node 22 (see [`.nvmrc`](.nvmrc)), [`uv`](http
 npm test   # the unit command — this is what CI gates on
 ```
 
-One command runs both unit suites: frontend vitest (**252 passed | 6 skipped** — the skips are env-gated live-integration and CLI replay tests) and backend pytest (**49 passed**), in parallel, hermetic (mocked I/O, per-test SQLite temp files), in under ~2 minutes.
+One command runs both unit suites: frontend vitest (**252 passed | 6 skipped** — the skips are env-gated live-integration and CLI replay tests) and backend pytest (**51 passed**), in parallel, hermetic (mocked I/O, per-test SQLite temp files), in under ~2 minutes.
 
 Beyond units, three more batteries (documented local, not in CI — a deliberate, recorded decision):
 
