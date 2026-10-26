@@ -38,8 +38,14 @@ def get_engine(url: str | None = None) -> Engine:
     resolved = url if url is not None else database_from_env()[0]
     target = normalize_database_url(resolved)
     if target not in _engine_cache:
-        connect_args = {"check_same_thread": False} if target.startswith("sqlite") else {}
-        _engine_cache[target] = create_engine(target, connect_args=connect_args)
+        if target.startswith("sqlite"):
+            _engine_cache[target] = create_engine(
+                target, connect_args={"check_same_thread": False}
+            )
+        else:
+            _engine_cache[target] = create_engine(
+                target, connect_args={}, pool_pre_ping=True
+            )
     return _engine_cache[target]
 
 
