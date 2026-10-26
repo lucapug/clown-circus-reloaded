@@ -14,6 +14,9 @@ Play it: **[production](https://clown-circus-reloaded-prod.onrender.com)** · **
 
 **[Gameplay video (~35 s, shot on production)](docs/demo/demo-video.mp4)** — the course's two-session verification ritual in one take: play → game over → submit the name → the entry visible on the leaderboard.
 
+![Gameplay](docs/demo/gameplay.png)
+*Mid-game on production — clown in flight, HUD visible (score / lives / level). The near-parity 2025 gameplay, rebuilt.*
+
 ![ccr-journey dashboard](docs/demo/journey-dashboard.png)
 *The `ccr-journey` dashboard in Grafana Cloud — per-endpoint request rate, duration (p95), and errors for the key user journey, grouped by environment (the environment filter dropdown is visible top-left).*
 
