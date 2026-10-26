@@ -1189,3 +1189,23 @@ The owner submits on the course platform and completes the **3 mandatory peer re
 M0–M7 executed on the agreed plan; 12/12 rubric criteria carried by verifiable evidence (self-assessment, believed 24/24 with the candor section); the tracker tells the truth (3 issues open BY CHOICE, all documented); the diary records every deviation including two days of provider degradation survived by work-in-files. The 2025 game, rebuilt by a 2026 agent team.
 
 **Learn-in-public addendum (2026-10-26):** the post is live — https://lnkd.in/p/da2a-8Wt (gameplay.png as the visual; the "same game, very different human role" story) — and the owner registered the link with the course submission within the same-day window. Remaining after submission: the 3 mandatory peer reviews close #69; then the improvement window (#66, #57, hygiene).
+
+## 2026-10-26 (evening) — Session handoff: post-submission state
+
+**Context:** submission completed today (pin `88d7593f6d84472484b976debeaa622359c06535`, platform form done); repo public since this morning; learn-in-public post live and registered. This entry is the authoritative start-of-next-session state; the repo markdowns (AGENTS.md → plan/process/backlog/diary) carry everything else.
+
+### State at handoff
+
+- **All milestones M0–M7 executed; the project is SUBMITTED.** Prod serves the pinned image (digest-gated, run 40303348895); dev identical; monitor green; alert Normal (noData handling fixed in the UI on Oct 25 — record on #66).
+- **Open issues (3, all by choice):** #69 `[must,M7,in-progress]` — closes after the owner completes the **3 mandatory peer reviews** (the submission AC is done; the orchestrator then posts the final comment, removes `in-progress`, and the issue closes as COMPLETED). #66 `[bug]` — post-submission fix candidate `pool_pre_ping=True` on `create_engine` (non-SQLite branch, `backend/app/database.py:42`); today's owner mid-session repro on prod is the sharpest evidence (comment 6412643770). #57 `[bug]` — awaits the owner's recorder trace at the next play session, then the fix-vs-v2 call.
+- **Small hygiene backlog (no rush):** remove the inert `DRILL_PROBE_5XX` env var from the dev service if still present (Render dashboard, owner); the scratch branch `ops/grafana-diagnose` (keep — documented as the #66 investigation tool, or delete after extracting its lessons); the local `feat/68-readme-demo` + `docs/demo-media` branches can be deleted (merged).
+
+### Next session's likely menu (owner decides)
+
+1. Peer reviews done → close #69 (the project's true end).
+2. Improvement window work: the #66 fix (small PR: pool_pre_ping + a regression note; the runbook/diary already document the mechanism), optionally #57 once a trace exists.
+3. Course application follow-up: the Production AI Agents for Generative Media form is ready (texts finalized in-session); registration button not yet active — owner DM'd Alexey; apply when it opens (by Nov 26).
+
+### Standing lessons (unchanged, still true)
+
+Verify-then-write against primary sources; work-in-files beats work-in-memory (survived ~a dozen provider failures across two days); small commits after every unit; the tracker is the truth (D2); handoff risk scales inversely with documentation — the repo just proved it again.
