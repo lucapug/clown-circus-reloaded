@@ -18,6 +18,8 @@ Clown Circus Reloaded is a browser remake of the 1970s arcade classics *Circus* 
      5. Short video (~30 s) of the verification ritual on PROD: play → game over → submit name → entry visible on the leaderboard
      6. ccr-env-version dashboard screenshot (every deploy as a service_version line) -->
 
+*A note on provenance: this project deliberately reimplements [Clown Circus Carnival](https://github.com/lucapug/clown-circus-carnival), my 2025 capstone for the course's first edition — same game, profoundly different method. The 2025 project manually orchestrated LLMs in assigned roles; this one is built with the AI-native engineering practices established over the past year (specifications, loops, graphs, subagents, CI/CD, observability — the 2026 edition's toolbox), applied and evaluated throughout the [project diary](_docs/diary.md).*
+
 ## Problem
 
 You control a seesaw. Two clowns take turns: one bounces on the seesaw, the other is launched skyward toward a grid of balloons — 4 rows × 14 balloons, each row worth more than the last (20 / 50 / 50 / 100 points, with row-clear bonuses of 200 / 500 / 500 / 1000). Pop balloons, clear rows, bank extra jumps, and keep both clowns alive: a clown that misses the seesaw costs a life. Each level adds speed (+25% velocity) and grants a life; the launch velocity itself grows with every launch and resets on death — so the game gets harder the better you play.
