@@ -85,8 +85,10 @@ describe('boarded-clown rest-exit and minimum slide (issue #57)', () => {
       expect(state.clowns[0].y).toBe(PIN_Y);
       expect(state.clowns[0].x).toBe(before + MIN_SLIDE_VX);
     }
-    // Pinned: 24 → 92 at 0.5 px/tick (≤ the ~140-tick bound).
-    expect(slideTicks).toBe(136);
+    // Pinned: the first slide tick ends at x = 24 (vx is floored AFTER
+    // integration, so the advance starts the next tick), then +0.5/tick to
+    // x = 92 — 137 slide ticks (≤ the ~140-tick bound).
+    expect(slideTicks).toBe(137);
 
     // Exit tick: x leaves the board rect; the board block no longer matches,
     // gravity resumes (vy = 0.3) and the clown falls.
@@ -99,7 +101,7 @@ describe('boarded-clown rest-exit and minimum slide (issue #57)', () => {
     // landing gate ([340, 460] at the initial seesaw.x = 400), so the clown
     // falls past FALL_OFF_Y — a fall-off death, bounded (136 slide ticks +
     // the pinned fall below; the old behavior stranded here forever).
-    let totalTicks = 137;
+    let totalTicks = 138;
     while (!events.some(isDeathEvent)) {
       advance();
       totalTicks++;
@@ -107,15 +109,17 @@ describe('boarded-clown rest-exit and minimum slide (issue #57)', () => {
     }
     const death = events.find(isDeathEvent);
     expect(death?.cause).toBe('fall-off');
-    expect(totalTicks).toBe(189); // pinned observed death tick
+    expect(totalTicks).toBe(190); // pinned observed death tick
   });
 
   it('board-bounced events from a BOARD_LAUNCH_VY landing are finite and bounded; after the last bounce the clown is in the slide regime', () => {
     // Launched straight down onto the upper-left board at the pin position,
-    // vx = 0 (the stranding input). Impact vy decays ≈ ×BOARD_DAMPING per
-    // bounce from BOARD_LAUNCH_VY + GRAVITY = 2.3 until 2.3 · 0.9^n falls
-    // below the rest threshold: ceil(log(0.5 / 2.3) / log(0.9)) ≈ 15 —
-    // bounded, versus the old decay-forever storm (~60 events/s sustained).
+    // vx = 0 (the stranding input). Bounces are bounded: each flight is
+    // shorter than the last, so the gravity gain per flight shrinks and the
+    // arrival vy decays below the rest threshold in a handful of bounces —
+    // the naive ceil(log(0.5 / 2.3) / log(0.9)) ≈ 15 overestimates (it
+    // assumes constant-length flights). Observed count pinned below, versus
+    // the old decay-forever storm (~60 events/s sustained).
     let state = startWith(flyer(40, PIN_Y, 0, BOARD_LAUNCH_VY));
     const rng = createRng(1);
     const eventsAt: GameEvent[][] = [];
@@ -132,7 +136,7 @@ describe('boarded-clown rest-exit and minimum slide (issue #57)', () => {
       .filter((t) => t > 0);
     // Bounded: exact deterministic count pinned (arithmetic above; fallback
     // bound 1–20 per the issue analysis).
-    expect(bounceTicks.length).toBe(13);
+    expect(bounceTicks.length).toBe(7);
     expect(bounceTicks.length).toBeGreaterThanOrEqual(1);
     expect(bounceTicks.length).toBeLessThanOrEqual(20);
 
