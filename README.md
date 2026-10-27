@@ -171,7 +171,7 @@ Named boundaries, with their practical consequences:
 
 ## Future work
 
-From the recorded WONT-v1 list (second-attempt candidates, prioritized): the #66 pool fix and #57 resolution first; then mobile/touch input, the trampoline "skating" edge case (owner gameplay call), sprite rotation in flight, level-up celebration pause, deeper dashboards, extended E2E scenarios, `/loop` automation over the backlog, parallel-worktree cycles, and a token-compression trial. The full list with rationale: [`_docs/plan.md`](_docs/plan.md) §6.
+From the recorded WONT-v1 list, the top three are **shipped post-submission**: the #66 pool fix ([v1.0.1](https://github.com/lucapug/clown-circus-reloaded/releases/tag/v1.0.1)) and the #57 boarding endgame — micro-bounce rest-exit plus the owner-called "skating" slide ([v1.0.2](https://github.com/lucapug/clown-circus-reloaded/releases/tag/v1.0.2), the kernel's first deliberate deviation from 2025 parity). Remaining candidates: mobile/touch input, sprite rotation in flight, level-up celebration pause, deeper dashboards, extended E2E scenarios, `/loop` automation over the backlog, parallel-worktree cycles, and a token-compression trial. The full list with rationale: [`_docs/plan.md`](_docs/plan.md) §6.
 
 ## Self-evaluation
 
