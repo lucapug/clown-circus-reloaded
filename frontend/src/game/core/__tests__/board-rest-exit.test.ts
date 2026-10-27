@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  BOARD_DAMPING,
   BOARD_HEIGHT,
   BOARD_LAUNCH_VY,
   BOARD_RECT_LEFT_X,
@@ -18,10 +17,9 @@ import type { Clown, GameState } from '../types';
 // Issue #57: a boarded clown whose bounce decays into micro-bounces used to
 // bounce forever at |vx| ≈ 0 — the stranding/storm this file pins the fix
 // against (rest-exit gate + minimum slide). BOARD_REST_VY and
-// BOARD_MIN_SLIDE_VX are added to constants.ts WITH the fix; the two values
-// are mirrored as commented literals here so this file is behavior-red on
-// main (stranding/storm), not import-red.
-const REST_VY = 0.5; // mirrors BOARD_REST_VY
+// BOARD_MIN_SLIDE_VX are added to constants.ts WITH the fix; BOARD_MIN_SLIDE_VX
+// (0.5) is mirrored as a commented literal below so this file is behavior-red
+// on main (stranding/storm), not import-red.
 const MIN_SLIDE_VX = 0.5; // mirrors BOARD_MIN_SLIDE_VX
 
 // Upper-left diving board (DIVING_BOARDS[0], side 'left'): rect x ∈
