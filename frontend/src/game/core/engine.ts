@@ -3,8 +3,10 @@ import {
   BOARD_HEIGHT,
   BOARD_LAUNCH_VX,
   BOARD_LAUNCH_VY,
+  BOARD_MIN_SLIDE_VX,
   BOARD_RECT_LEFT_X,
   BOARD_RECT_RIGHT_X,
+  BOARD_REST_VY,
   BOARD_WIDTH,
   COLLISION_DISTANCE,
   CLOWN_SIZE,
@@ -175,9 +177,22 @@ export function step(
         clown.y <= boardY + BOARD_HEIGHT
       ) {
         if (clown.vy > 0) {
-          clown.vy = -Math.abs(clown.vy) * BOARD_DAMPING;
-          clown.y = boardY - CLOWN_SIZE;
-          events.push({ type: 'board-bounced', clownIndex: i as 0 | 1 });
+          if (clown.vy * BOARD_DAMPING >= BOARD_REST_VY) {
+            clown.vy = -Math.abs(clown.vy) * BOARD_DAMPING;
+            clown.y = boardY - CLOWN_SIZE;
+            events.push({ type: 'board-bounced', clownIndex: i as 0 | 1 });
+          } else {
+            // Slide regime (rest-exit, issue #57): emergent, NO state flag —
+            // gravity re-adds GRAVITY each tick and GRAVITY * BOARD_DAMPING
+            // = 0.27 < BOARD_REST_VY re-fires this branch every tick,
+            // re-zeroing vy and re-pinning y. The branch IS the regime.
+            clown.vy = 0;
+            clown.y = boardY - CLOWN_SIZE;
+            if (Math.abs(clown.vx) < BOARD_MIN_SLIDE_VX) {
+              const dir = clown.vx > 0 ? 1 : clown.vx < 0 ? -1 : (board.side === 'left' ? 1 : -1);
+              clown.vx = dir * BOARD_MIN_SLIDE_VX;
+            }
+          }
         }
       }
     }

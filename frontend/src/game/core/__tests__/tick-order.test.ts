@@ -87,15 +87,18 @@ describe('pinned tick order (spec §3)', () => {
   it('clamps at the wall before the diving-board bounce check', () => {
     // Integrates to x = 20 (outside the left board rect [22, 92]); the wall
     // clamp must move it to 24 BEFORE the board check, so it still bounces.
+    // vy = 1 keeps the contact super-threshold ((1 + 0.3) · 0.9 = 1.17 ≥
+    // BOARD_REST_VY): a sub-threshold contact now enters the #57 slide
+    // regime instead of bouncing (pinned by board-rest-exit.test.ts).
     const { state } = step(
-      playing({ balloons: [], clowns: [flying(21, 250, -1, 0), seatedLeft(370)] }),
+      playing({ balloons: [], clowns: [flying(21, 250, -1, 1), seatedLeft(370)] }),
       [],
       createRng(1),
     );
     const c = state.clowns[0];
     expect(c.x).toBe(WALL_X_MIN);
     expect(c.y).toBe(245 - CLOWN_SIZE); // bounced off the upper-left board (boardY = 250 - 5)
-    expect(c.vy).toBe(-(GRAVITY * BOARD_DAMPING));
+    expect(c.vy).toBe(-((1 + GRAVITY) * BOARD_DAMPING));
   });
 
   it('bounces on diving boards before balloon collision (pop reflects the post-bounce position)', () => {

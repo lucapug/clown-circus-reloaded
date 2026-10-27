@@ -65,6 +65,21 @@ export const JUMP_VELOCITY_STEP = 0.2;
 export const BOARD_LAUNCH_VY = 2;
 export const BOARD_LAUNCH_VX = 3;
 
+// Board rest-exit threshold (issue #57, owner decisions 2026-10-27): a
+// falling board contact bounces only while vy · BOARD_DAMPING ≥ this; below
+// it the contact enters the slide regime instead (vy zeroed, minimum slide).
+// MUST stay > GRAVITY · BOARD_DAMPING = 0.27: the no-state-flag slide regime
+// relies on the per-tick re-contact (gravity re-adds 0.3) re-firing the
+// sub-threshold branch — below 0.27 it would re-emit board-bounced and the
+// micro-bounce storm returns (spec §3.4 invariant, 2026 owner deviation).
+export const BOARD_REST_VY = 0.5;
+
+// Minimum slide speed in the board rest-exit regime (issue #57): while
+// sliding, |vx| is floored at this every tick — direction is sign(vx), else
+// the board-side launch direction — so a stranded vx ≈ 0 clown always
+// crosses the board and falls off (deterministic end state, spec §3.4).
+export const BOARD_MIN_SLIDE_VX = 0.5;
+
 // Random entry-board height (owner decision 2026-10-19, issue #20 — resolves
 // the TODO(owner) of issue #6 comment 6252402875): from level 4 a death
 // respawns the entering clown on the high or low board of the free side,
